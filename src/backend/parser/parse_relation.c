@@ -24,6 +24,7 @@
 #include "funcapi.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
+#include "optimizer/clauses.h"
 #include "parser/parsetree.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
@@ -37,6 +38,8 @@ static RangeTblEntry *scanNameSpaceForRefname(ParseState *pstate,
 						const char *refname, int location);
 static RangeTblEntry *scanNameSpaceForRelid(ParseState *pstate, Oid relid,
 					  int location);
+static void check_lateral_ref_ok(ParseState *pstate, ParseNamespaceItem *nsitem,
+					 int location);
 static void markRTEForSelectPriv(ParseState *pstate, RangeTblEntry *rte,
 					 int rtindex, AttrNumber col);
 static void expandRelation(Oid relid, Alias *eref,
@@ -130,6 +133,18 @@ refnameRangeTblEntry(ParseState *pstate,
  * Search the query's table namespace for an RTE matching the
  * given unqualified refname.  Return the RTE if a unique match, or NULL
  * if no match.  Raise error if multiple matches.
+ *
+ * Note: it might seem that we shouldn't have to worry about the possibility
+ * of multiple matches; after all, the SQL standard disallows duplicate table
+ * aliases within a given SELECT level.  Historically, however, Postgres has
+ * been laxer than that.  For example, we allow
+ *		SELECT ... FROM tab1 x CROSS JOIN (tab2 x CROSS JOIN tab3 y) z
+ * on the grounds that the aliased join (z) hides the aliases within it,
+ * therefore there is no conflict between the two RTEs named "x".  However,
+ * if tab3 is a LATERAL subquery, then from within the subquery both "x"es
+ * are visible.  Rather than rejecting queries that used to work, we allow
+ * this situation, and complain only if there's actually an ambiguous
+ * reference to "x".
  */
 static RangeTblEntry *
 scanNameSpaceForRefname(ParseState *pstate, const char *refname, int location)
@@ -157,14 +172,7 @@ scanNameSpaceForRefname(ParseState *pstate, const char *refname, int location)
 						 errmsg("table reference \"%s\" is ambiguous",
 								refname),
 						 parser_errposition(pstate, location)));
-			/* SQL:2008 demands this be an error, not an invisible item */
-			if (nsitem->p_lateral_only && !nsitem->p_lateral_ok)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-						 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
-								refname),
-						 errdetail("The combining JOIN type must be INNER or LEFT for a LATERAL reference."),
-						 parser_errposition(pstate, location)));
+			check_lateral_ref_ok(pstate, nsitem, location);
 			result = rte;
 		}
 	}
@@ -174,8 +182,7 @@ scanNameSpaceForRefname(ParseState *pstate, const char *refname, int location)
 /*
  * Search the query's table namespace for a relation RTE matching the
  * given relation OID.	Return the RTE if a unique match, or NULL
- * if no match.  Raise error if multiple matches (which shouldn't
- * happen if the namespace was checked correctly when it was created).
+ * if no match.  Raise error if multiple matches.
  *
  * See the comments for refnameRangeTblEntry to understand why this
  * acts the way it does.
@@ -209,14 +216,7 @@ scanNameSpaceForRelid(ParseState *pstate, Oid relid, int location)
 						 errmsg("table reference %u is ambiguous",
 								relid),
 						 parser_errposition(pstate, location)));
-			/* SQL:2008 demands this be an error, not an invisible item */
-			if (nsitem->p_lateral_only && !nsitem->p_lateral_ok)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-						 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
-								rte->eref->aliasname),
-						 errdetail("The combining JOIN type must be INNER or LEFT for a LATERAL reference."),
-						 parser_errposition(pstate, location)));
+			check_lateral_ref_ok(pstate, nsitem, location);
 			result = rte;
 		}
 	}
@@ -395,6 +395,37 @@ checkNameSpaceConflicts(ParseState *pstate, List *namespace1,
 					 errmsg("table name \"%s\" specified more than once",
 							aliasname1)));
 		}
+	}
+}
+
+/*
+ * Complain if a namespace item is currently disallowed as a LATERAL reference.
+ * This enforces both SQL:2008's rather odd idea of what to do with a LATERAL
+ * reference to the wrong side of an outer join, and our own prohibition on
+ * referencing the target table of an UPDATE or DELETE as a lateral reference
+ * in a FROM/USING clause.
+ *
+ * Convenience subroutine to avoid multiple copies of a rather ugly ereport.
+ */
+static void
+check_lateral_ref_ok(ParseState *pstate, ParseNamespaceItem *nsitem,
+					 int location)
+{
+	if (nsitem->p_lateral_only && !nsitem->p_lateral_ok)
+	{
+		/* SQL:2008 demands this be an error, not an invisible item */
+		RangeTblEntry *rte = nsitem->p_rte;
+		char	   *refname = rte->eref->aliasname;
+
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+			errmsg("invalid reference to FROM-clause entry for table \"%s\"",
+				   refname),
+				 (rte == pstate->p_target_rangetblentry) ?
+				 errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
+						 refname) :
+				 errdetail("The combining JOIN type must be INNER or LEFT for a LATERAL reference."),
+				 parser_errposition(pstate, location)));
 	}
 }
 
@@ -610,15 +641,8 @@ colNameToVar(ParseState *pstate, char *colname, bool localonly,
 							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 							 errmsg("column reference \"%s\" is ambiguous",
 									colname),
-							 parser_errposition(orig_pstate, location)));
-				/* SQL:2008 demands this be an error, not an invisible item */
-				if (nsitem->p_lateral_only && !nsitem->p_lateral_ok)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-							 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
-									rte->eref->aliasname),
-							 errdetail("The combining JOIN type must be INNER or LEFT for a LATERAL reference."),
-							 parser_errposition(orig_pstate, location)));
+							 parser_errposition(pstate, location)));
+				check_lateral_ref_ok(pstate, nsitem, location);
 				result = newresult;
 			}
 		}
@@ -749,14 +773,15 @@ markRTEForSelectPriv(ParseState *pstate, RangeTblEntry *rte,
 			 * The aliasvar could be either a Var or a COALESCE expression,
 			 * but in the latter case we should already have marked the two
 			 * referent variables as being selected, due to their use in the
-			 * JOIN clause.  So we need only be concerned with the simple Var
-			 * case.
+			 * JOIN clause.  So we need only be concerned with the Var case.
+			 * But we do need to drill down through implicit coercions.
 			 */
 			Var		   *aliasvar;
 
 			Assert(col > 0 && col <= list_length(rte->joinaliasvars));
 			aliasvar = (Var *) list_nth(rte->joinaliasvars, col - 1);
-			if (IsA(aliasvar, Var))
+			aliasvar = (Var *) strip_implicit_coercions((Node *) aliasvar);
+			if (aliasvar && IsA(aliasvar, Var))
 				markVarForSelectPriv(pstate, aliasvar, NULL);
 		}
 	}
@@ -1598,6 +1623,10 @@ isLockedRefname(ParseState *pstate, const char *refname)
  * and/or namespace list.  (We assume caller has checked for any
  * namespace conflicts.)  The RTE is always marked as unconditionally
  * visible, that is, not LATERAL-only.
+ *
+ * Note: some callers know that they can find the new ParseNamespaceItem
+ * at the end of the pstate->p_namespace list.  This is a bit ugly but not
+ * worth complicating this function's signature for.
  */
 void
 addRTEtoQuery(ParseState *pstate, RangeTblEntry *rte,
@@ -1841,10 +1870,10 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 					 * deleted columns in the join; but we have to check since
 					 * this routine is also used by the rewriter, and joins
 					 * found in stored rules might have join columns for
-					 * since-deleted columns.  This will be signaled by a NULL
-					 * Const in the alias-vars list.
+					 * since-deleted columns.  This will be signaled by a null
+					 * pointer in the alias-vars list.
 					 */
-					if (IsA(avar, Const))
+					if (avar == NULL)
 					{
 						if (include_dropped)
 						{
@@ -1852,8 +1881,16 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 								*colnames = lappend(*colnames,
 													makeString(pstrdup("")));
 							if (colvars)
+							{
+								/*
+								 * Can't use join's column type here (it might
+								 * be dropped!); but it doesn't really matter
+								 * what type the Const claims to be.
+								 */
 								*colvars = lappend(*colvars,
-												   copyObject(avar));
+												   makeNullConst(INT4OID, -1,
+																 InvalidOid));
+							}
 						}
 						continue;
 					}
@@ -2242,6 +2279,7 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 
 				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
 				aliasvar = (Node *) list_nth(rte->joinaliasvars, attnum - 1);
+				Assert(aliasvar != NULL);
 				*vartype = exprType(aliasvar);
 				*vartypmod = exprTypmod(aliasvar);
 				*varcollid = exprCollation(aliasvar);
@@ -2304,7 +2342,7 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 				 * but one in a stored rule might contain columns that were
 				 * dropped from the underlying tables, if said columns are
 				 * nowhere explicitly referenced in the rule.  This will be
-				 * signaled to us by a NULL Const in the joinaliasvars list.
+				 * signaled to us by a null pointer in the joinaliasvars list.
 				 */
 				Var		   *aliasvar;
 
@@ -2313,7 +2351,7 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 					elog(ERROR, "invalid varattno %d", attnum);
 				aliasvar = (Var *) list_nth(rte->joinaliasvars, attnum - 1);
 
-				result = IsA(aliasvar, Const);
+				result = (aliasvar == NULL);
 			}
 			break;
 		case RTE_FUNCTION:

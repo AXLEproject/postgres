@@ -438,7 +438,7 @@ WalReceiverMain(void)
 						{
 							ereport(LOG,
 									(errmsg("replication terminated by primary server"),
-									 errdetail("End of WAL reached on timeline %u at %X/%X",
+									 errdetail("End of WAL reached on timeline %u at %X/%X.",
 											   startpointTLI,
 											   (uint32) (LogstreamResult.Write >> 32), (uint32) LogstreamResult.Write)));
 							endofwal = true;
@@ -737,7 +737,11 @@ WalRcvSigHupHandler(SIGNAL_ARGS)
 static void
 WalRcvSigUsr1Handler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	latch_sigusr1_handler();
+
+	errno = save_errno;
 }
 
 /* SIGTERM: set flag for main loop, or shutdown immediately if safe */
@@ -927,7 +931,7 @@ XLogWalRcvWrite(char *buf, Size nbytes, XLogRecPtr recptr)
 			if (lseek(recvFile, (off_t) startoff, SEEK_SET) < 0)
 				ereport(PANIC,
 						(errcode_for_file_access(),
-				 errmsg("could not seek in log segment %s, to offset %u: %m",
+				 errmsg("could not seek in log segment %s to offset %u: %m",
 						XLogFileNameP(recvFileTLI, recvSegNo),
 						startoff)));
 			recvOff = startoff;
@@ -1007,7 +1011,10 @@ XLogWalRcvFlush(bool dying)
 
 		/* Also let the master know that we made some progress */
 		if (!dying)
+		{
 			XLogWalRcvSendReply(false, false);
+			XLogWalRcvSendHSFeedback(false);
+		}
 	}
 }
 

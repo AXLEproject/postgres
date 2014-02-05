@@ -401,7 +401,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt_long(argc, argv, "abcCd:E:f:F:h:ij:K:n:N:oOp:RsS:t:T:U:vwWxZ:",
+	while ((c = getopt_long(argc, argv, "abcCd:E:f:F:h:ij:n:N:oOp:RsS:t:T:U:vwWxZ:",
 							long_options, &optindex)) != -1)
 	{
 		switch (c)
@@ -5746,7 +5746,7 @@ EventTriggerInfo *
 getEventTriggers(Archive *fout, int *numEventTriggers)
 {
 	int			i;
-	PQExpBuffer query = createPQExpBuffer();
+	PQExpBuffer query;
 	PGresult   *res;
 	EventTriggerInfo *evtinfo;
 	int			i_tableoid,
@@ -5765,6 +5765,8 @@ getEventTriggers(Archive *fout, int *numEventTriggers)
 		*numEventTriggers = 0;
 		return NULL;
 	}
+
+	query = createPQExpBuffer();
 
 	/* Make sure we are in proper schema */
 	selectSourceSchema(fout, "pg_catalog");
@@ -13126,7 +13128,8 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		 * attislocal correctly, plus fix up any inherited CHECK constraints.
 		 * Analogously, we set up typed tables using ALTER TABLE / OF here.
 		 */
-		if (binary_upgrade && tbinfo->relkind == RELKIND_RELATION)
+		if (binary_upgrade && (tbinfo->relkind == RELKIND_RELATION || 
+							   tbinfo->relkind == RELKIND_FOREIGN_TABLE) )
 		{
 			for (j = 0; j < tbinfo->numatts; j++)
 			{
@@ -13144,13 +13147,19 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 					appendStringLiteralAH(q, fmtId(tbinfo->dobj.name), fout);
 					appendPQExpBuffer(q, "::pg_catalog.regclass;\n");
 
-					appendPQExpBuffer(q, "ALTER TABLE ONLY %s ",
-									  fmtId(tbinfo->dobj.name));
+					if (tbinfo->relkind == RELKIND_RELATION)
+						appendPQExpBuffer(q, "ALTER TABLE ONLY %s ",
+										  fmtId(tbinfo->dobj.name));
+					else
+						appendPQExpBuffer(q, "ALTER FOREIGN TABLE %s ",
+										  fmtId(tbinfo->dobj.name));
+						
 					appendPQExpBuffer(q, "DROP COLUMN %s;\n",
 									  fmtId(tbinfo->attnames[j]));
 				}
 				else if (!tbinfo->attislocal[j])
 				{
+					Assert(tbinfo->relkind != RELKIND_FOREIGN_TABLE);
 					appendPQExpBuffer(q, "\n-- For binary upgrade, recreate inherited column.\n");
 					appendPQExpBuffer(q, "UPDATE pg_catalog.pg_attribute\n"
 									  "SET attislocal = false\n"
@@ -13483,6 +13492,7 @@ static void
 dumpIndex(Archive *fout, IndxInfo *indxinfo)
 {
 	TableInfo  *tbinfo = indxinfo->indextable;
+	bool		is_constraint = (indxinfo->indexconstraint != 0);
 	PQExpBuffer q;
 	PQExpBuffer delq;
 	PQExpBuffer labelq;
@@ -13500,9 +13510,11 @@ dumpIndex(Archive *fout, IndxInfo *indxinfo)
 	/*
 	 * If there's an associated constraint, don't dump the index per se, but
 	 * do dump any comment for it.	(This is safe because dependency ordering
-	 * will have ensured the constraint is emitted first.)
+	 * will have ensured the constraint is emitted first.)  Note that the
+	 * emitted comment has to be shown as depending on the constraint, not
+	 * the index, in such cases.
 	 */
-	if (indxinfo->indexconstraint == 0)
+	if (!is_constraint)
 	{
 		if (binary_upgrade)
 			binary_upgrade_set_pg_class_oids(fout, q,
@@ -13544,7 +13556,9 @@ dumpIndex(Archive *fout, IndxInfo *indxinfo)
 	dumpComment(fout, labelq->data,
 				tbinfo->dobj.namespace->dobj.name,
 				tbinfo->rolname,
-				indxinfo->dobj.catId, 0, indxinfo->dobj.dumpId);
+				indxinfo->dobj.catId, 0,
+				is_constraint ? indxinfo->indexconstraint :
+				indxinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(q);
 	destroyPQExpBuffer(delq);
@@ -14111,6 +14125,10 @@ dumpSequenceData(Archive *fout, TableDataInfo *tdinfo)
 	destroyPQExpBuffer(query);
 }
 
+/*
+ * dumpTrigger
+ *	  write the declaration of one user-defined table trigger
+ */
 static void
 dumpTrigger(Archive *fout, TriggerInfo *tginfo)
 {
@@ -14123,6 +14141,10 @@ dumpTrigger(Archive *fout, TriggerInfo *tginfo)
 	const char *p;
 	int			findx;
 
+	/*
+	 * we needn't check dobj.dump because TriggerInfo wouldn't have been
+	 * created in the first place for non-dumpable triggers
+	 */
 	if (dataOnly)
 		return;
 
@@ -14313,11 +14335,19 @@ dumpTrigger(Archive *fout, TriggerInfo *tginfo)
 	destroyPQExpBuffer(labelq);
 }
 
+/*
+ * dumpEventTrigger
+ *	  write the declaration of one user-defined event trigger
+ */
 static void
 dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 {
 	PQExpBuffer query;
 	PQExpBuffer labelq;
+
+	/* Skip if not to be dumped */
+	if (!evtinfo->dobj.dump || dataOnly)
+		return;
 
 	query = createPQExpBuffer();
 	labelq = createPQExpBuffer();

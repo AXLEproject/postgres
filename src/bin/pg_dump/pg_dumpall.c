@@ -452,6 +452,9 @@ main(int argc, char *argv[])
 	 * database we're connected to at the moment is fine.
 	 */
 
+	/* Restore will need to write to the target cluster */
+	fprintf(OPF, "SET default_transaction_read_only = off;\n\n");
+
 	/* Replicate encoding and std_strings in output */
 	fprintf(OPF, "SET client_encoding = '%s';\n",
 			pg_encoding_to_char(encoding));
@@ -696,7 +699,7 @@ dumpRoles(PGconn *conn)
 						  "valuntil as rolvaliduntil, "
 						  "false as rolreplication, "
 						  "null as rolcomment, "
-						  "rolname = current_user AS is_current_user "
+						  "usename = current_user AS is_current_user "
 						  "FROM pg_shadow "
 						  "UNION ALL "
 						  "SELECT 0, groname as rolname, "
@@ -1600,6 +1603,17 @@ dumpDatabases(PGconn *conn)
 
 		fprintf(OPF, "\\connect %s\n\n", fmtId(dbname));
 
+		/*
+		 * Restore will need to write to the target cluster.  This connection
+		 * setting is emitted for pg_dumpall rather than in the code also used
+		 * by pg_dump, so that a cluster with databases or users which have
+		 * this flag turned on can still be replicated through pg_dumpall
+		 * without editing the file or stream.  With pg_dump there are many
+		 * other ways to allow the file to be used, and leaving it out allows
+		 * users to protect databases from being accidental restore targets.
+		 */
+		fprintf(OPF, "SET default_transaction_read_only = off;\n\n");
+
 		if (filename)
 			fclose(OPF);
 
@@ -1752,7 +1766,7 @@ connectDatabase(const char *dbname, const char *connection_string,
 			conn_opts = PQconninfoParse(connection_string, &err_msg);
 			if (conn_opts == NULL)
 			{
-				fprintf(stderr, "%s: %s\n", progname, err_msg);
+				fprintf(stderr, "%s: %s", progname, err_msg);
 				exit_nicely(1);
 			}
 
