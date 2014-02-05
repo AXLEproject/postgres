@@ -327,7 +327,7 @@ DATA(insert OID = 26 (	oid		   PGNSP PGUID	4 t b N t t \054 0	 0 1028 oidin oido
 DESCR("object identifier(oid), maximum 4 billion");
 #define OIDOID			26
 
-DATA(insert OID = 27 (	tid		   PGNSP PGUID	6 f b U f t \054 0	 0 1010 tidin tidout tidrecv tidsend - - - s p f 0 -1 0 0 _null_ _null_ _null_ ));
+DATA(insert OID = 27 (	tid		   PGNSP PGUID	8 f b U f t \054 0	 0 1010 tidin tidout tidrecv tidsend - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
 DESCR("(block, offset), physical location of tuple");
 #define TIDOID		27
 

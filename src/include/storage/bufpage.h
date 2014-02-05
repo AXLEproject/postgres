@@ -77,10 +77,10 @@ typedef Pointer Page;
 /*
  * location (byte offset) within a page.
  *
- * note that this is actually limited to 2^15 because we have limited
- * ItemIdData.lp_off and ItemIdData.lp_len to 15 bits (see itemid.h).
+ * note that this is actually limited to 2^20 because we have limited
+ * ItemIdData.lp_off and ItemIdData.lp_len to 20 bits (see itemid.h).
  */
-typedef uint16 LocationIndex;
+typedef uint32 LocationIndex;
 
 
 /*
@@ -154,7 +154,7 @@ typedef struct PageHeaderData
 	LocationIndex pd_lower;		/* offset to start of free space */
 	LocationIndex pd_upper;		/* offset to end of free space */
 	LocationIndex pd_special;	/* offset to start of special space */
-	uint16		pd_pagesize_version;
+	uint32		pd_pagesize_version;
 	TransactionId pd_prune_xid; /* oldest prunable XID, or zero if none */
 	ItemIdData	pd_linp[1];		/* beginning of line pointer array */
 } PageHeaderData;
@@ -263,7 +263,7 @@ typedef PageHeaderData *PageHeader;
  * however, it can be called on a page that is not stored in a buffer.
  */
 #define PageGetPageSize(page) \
-	((Size) (((PageHeader) (page))->pd_pagesize_version & (uint16) 0xFF00))
+	((Size) (((PageHeader) (page))->pd_pagesize_version & (uint32) 0xFFFFFF00))
 
 /*
  * PageGetPageLayoutVersion
@@ -281,7 +281,7 @@ typedef PageHeaderData *PageHeader;
  */
 #define PageSetPageSizeAndVersion(page, size, version) \
 ( \
-	AssertMacro(((size) & 0xFF00) == (size)), \
+	AssertMacro(((size) & 0xFFFFFF00) == (size)), \
 	AssertMacro(((version) & 0x00FF) == (version)), \
 	((PageHeader) (page))->pd_pagesize_version = (size) | (version) \
 )

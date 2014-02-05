@@ -134,7 +134,7 @@ static List *insert_ordered_unique_oid(List *list, Oid datum);
 static FormData_pg_attribute a1 = {
 	0, {"ctid"}, TIDOID, 0, sizeof(ItemPointerData),
 	SelfItemPointerAttributeNumber, 0, -1, -1,
-	false, 'p', 's', true, false, false, true, 0
+	false, 'p', 'i', true, false, false, true, 0
 };
 
 static FormData_pg_attribute a2 = {

@@ -1272,8 +1272,8 @@ XLogCheckBuffer(XLogRecData *rdata, bool holdsExclusiveLock,
 		if (rdata->buffer_std)
 		{
 			/* Assume we can omit data between pd_lower and pd_upper */
-			uint16		lower = ((PageHeader) page)->pd_lower;
-			uint16		upper = ((PageHeader) page)->pd_upper;
+			uint32		lower = ((PageHeader) page)->pd_lower;
+			uint32		upper = ((PageHeader) page)->pd_upper;
 
 			if (lower >= SizeOfPageHeaderData &&
 				upper > lower &&

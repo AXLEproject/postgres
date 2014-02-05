@@ -148,14 +148,14 @@ typedef struct GinMetaPageData
 	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0 && \
 	 GinItemPointerGetBlockNumber(p) == (BlockNumber)0)
 #define ItemPointerSetMax(p)  \
-	ItemPointerSet((p), InvalidBlockNumber, (OffsetNumber)0xffff)
+	ItemPointerSet((p), InvalidBlockNumber, (OffsetNumber)0xffffffff)
 #define ItemPointerIsMax(p)  \
-	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffff && \
+	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffffffff && \
 	 GinItemPointerGetBlockNumber(p) == InvalidBlockNumber)
 #define ItemPointerSetLossyPage(p, b)  \
-	ItemPointerSet((p), (b), (OffsetNumber)0xffff)
+	ItemPointerSet((p), (b), (OffsetNumber)0xffffffff)
 #define ItemPointerIsLossyPage(p)  \
-	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffff && \
+	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffffffff && \
 	 GinItemPointerGetBlockNumber(p) != InvalidBlockNumber)
 
 /*
@@ -206,7 +206,7 @@ typedef signed char GinNullCategory;
  */
 #define GinGetNPosting(itup)	GinItemPointerGetOffsetNumber(&(itup)->t_tid)
 #define GinSetNPosting(itup,n)	ItemPointerSetOffsetNumber(&(itup)->t_tid,n)
-#define GIN_TREE_POSTING		((OffsetNumber)0xffff)
+#define GIN_TREE_POSTING		((OffsetNumber)0xffffffff)
 #define GinIsPostingTree(itup)	(GinGetNPosting(itup) == GIN_TREE_POSTING)
 #define GinSetPostingTree(itup, blkno)	( GinSetNPosting((itup),GIN_TREE_POSTING), ItemPointerSetBlockNumber(&(itup)->t_tid, blkno) )
 #define GinGetPostingTree(itup) GinItemPointerGetBlockNumber(&(itup)->t_tid)

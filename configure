@@ -2873,6 +2873,10 @@ case ${blocksize} in
   8) BLCKSZ=8192;;
  16) BLCKSZ=16384;;
  32) BLCKSZ=32768;;
+ 64) BLCKSZ=65536;;
+ 128) BLCKSZ=131072;;
+ 256) BLCKSZ=262144;;
+ 1024) BLCKSZ=1048576;;
   *) { { $as_echo "$as_me:$LINENO: error: Invalid block size. Allowed values are 1,2,4,8,16,32." >&5
 $as_echo "$as_me: error: Invalid block size. Allowed values are 1,2,4,8,16,32." >&2;}
    { (exit 1); exit 1; }; }
