@@ -76,6 +76,7 @@
 #include "utils/timestamp.h"
 #include "mb/pg_wchar.h"
 
+#include "zsim_hooks.h"
 
 extern char *optarg;
 extern int	optind;
@@ -3526,6 +3527,12 @@ PostgresMain(int argc, char *argv[],
 			 const char *dbname,
 			 const char *username)
 {
+        /*
+         * AAS: Start of the ROI
+         */
+        zsim_roi_begin();
+        zsim_heartbeat();
+
 	int			firstchar;
 	StringInfoData input_message;
 	sigjmp_buf	local_sigjmp_buf;
@@ -4216,6 +4223,13 @@ PostgresMain(int argc, char *argv[],
 				 * it will fail to be called during other backend-shutdown
 				 * scenarios.
 				 */
+
+                                /*
+                                 * AAS: End of the ROI
+                                 */
+                                zsim_heartbeat();
+                                zsim_roi_end();
+
 				proc_exit(0);
 
 			case 'd':			/* copy data */

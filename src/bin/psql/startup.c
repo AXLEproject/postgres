@@ -28,7 +28,7 @@
 #include "mainloop.h"
 #include "settings.h"
 
-
+#include "zsim_hooks.h"
 
 /*
  * Global psql options
@@ -275,6 +275,12 @@ main(int argc, char *argv[])
 	 * Now find something to do
 	 */
 
+        /*
+         * AAS: Start of the ROI
+         */
+        zsim_roi_begin();
+        zsim_heartbeat();
+
 	/*
 	 * process file given by -f
 	 */
@@ -333,6 +339,12 @@ main(int argc, char *argv[])
 		initializeInput(options.no_readline ? 0 : 1);
 		successResult = MainLoop(stdin);
 	}
+
+        /*
+         * AAS: End of the ROI
+         */
+        zsim_heartbeat();
+        zsim_roi_end();
 
 	/* clean up */
 	if (pset.logfile)
