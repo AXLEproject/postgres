@@ -32,3 +32,8 @@ lib*.pc
 /pgsql.sln.cache
 /Debug/
 /Release/
+
+# Sim branch ignored folders
+data/
+local/
+build/
