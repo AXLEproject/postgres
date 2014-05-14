@@ -1,0 +1,200 @@
+diff --git a/configure b/configure
+index 9efd866..c1ed27e 100755
+--- a/configure
++++ b/configure
+@@ -2872,6 +2872,7 @@ case ${blocksize} in
+   8) BLCKSZ=8192;;
+  16) BLCKSZ=16384;;
+  32) BLCKSZ=32768;;
++ 1024) BLCKSZ=1048576;;
+   *) { { $as_echo "$as_me:$LINENO: error: Invalid block size. Allowed values are 1,2,4,8,16,32." >&5
+ $as_echo "$as_me: error: Invalid block size. Allowed values are 1,2,4,8,16,32." >&2;}
+    { (exit 1); exit 1; }; }
+diff --git a/src/backend/access/transam/xlog.c b/src/backend/access/transam/xlog.c
+index d644e39..8963edc 100644
+--- a/src/backend/access/transam/xlog.c
++++ b/src/backend/access/transam/xlog.c
+@@ -1240,8 +1240,8 @@ XLogCheckBuffer(XLogRecData *rdata, bool doPageWrites,
+ 		if (rdata->buffer_std)
+ 		{
+ 			/* Assume we can omit data between pd_lower and pd_upper */
+-			uint16		lower = ((PageHeader) page)->pd_lower;
+-			uint16		upper = ((PageHeader) page)->pd_upper;
++			uint32		lower = ((PageHeader) page)->pd_lower;
++			uint32		upper = ((PageHeader) page)->pd_upper;
+ 
+ 			if (lower >= SizeOfPageHeaderData &&
+ 				upper > lower &&
+diff --git a/src/backend/catalog/heap.c b/src/backend/catalog/heap.c
+index db51e0b..a5c6226 100644
+--- a/src/backend/catalog/heap.c
++++ b/src/backend/catalog/heap.c
+@@ -133,7 +133,7 @@ static List *insert_ordered_unique_oid(List *list, Oid datum);
+ static FormData_pg_attribute a1 = {
+ 	0, {"ctid"}, TIDOID, 0, sizeof(ItemPointerData),
+ 	SelfItemPointerAttributeNumber, 0, -1, -1,
+-	false, 'p', 's', true, false, false, true, 0
++	false, 'p', 'i', true, false, false, true, 0
+ };
+ 
+ static FormData_pg_attribute a2 = {
+diff --git a/src/backend/storage/buffer/freelist.c b/src/backend/storage/buffer/freelist.c
+index c76aaf7..fc40040 100644
+--- a/src/backend/storage/buffer/freelist.c
++++ b/src/backend/storage/buffer/freelist.c
+@@ -422,13 +422,13 @@ GetAccessStrategy(BufferAccessStrategyType btype)
+ 			return NULL;
+ 
+ 		case BAS_BULKREAD:
+-			ring_size = 256 * 1024 / BLCKSZ;
++			ring_size = 16 * 1024 * 1024 / BLCKSZ;
+ 			break;
+ 		case BAS_BULKWRITE:
+ 			ring_size = 16 * 1024 * 1024 / BLCKSZ;
+ 			break;
+ 		case BAS_VACUUM:
+-			ring_size = 256 * 1024 / BLCKSZ;
++			ring_size = 16 * 1024 * 1024 / BLCKSZ;
+ 			break;
+ 
+ 		default:
+diff --git a/src/include/access/gin_private.h b/src/include/access/gin_private.h
+index 1868b77..9d19044 100644
+--- a/src/include/access/gin_private.h
++++ b/src/include/access/gin_private.h
+@@ -148,14 +148,14 @@ typedef struct GinMetaPageData
+ 	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0 && \
+ 	 GinItemPointerGetBlockNumber(p) == (BlockNumber)0)
+ #define ItemPointerSetMax(p)  \
+-	ItemPointerSet((p), InvalidBlockNumber, (OffsetNumber)0xffff)
++	ItemPointerSet((p), InvalidBlockNumber, (OffsetNumber)0xffffffff)
+ #define ItemPointerIsMax(p)  \
+-	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffff && \
++	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffffffff && \
+ 	 GinItemPointerGetBlockNumber(p) == InvalidBlockNumber)
+ #define ItemPointerSetLossyPage(p, b)  \
+-	ItemPointerSet((p), (b), (OffsetNumber)0xffff)
++	ItemPointerSet((p), (b), (OffsetNumber)0xffffffff)
+ #define ItemPointerIsLossyPage(p)  \
+-	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffff && \
++	(GinItemPointerGetOffsetNumber(p) == (OffsetNumber)0xffffffff && \
+ 	 GinItemPointerGetBlockNumber(p) != InvalidBlockNumber)
+ 
+ /*
+@@ -206,7 +206,7 @@ typedef signed char GinNullCategory;
+  */
+ #define GinGetNPosting(itup)	GinItemPointerGetOffsetNumber(&(itup)->t_tid)
+ #define GinSetNPosting(itup,n)	ItemPointerSetOffsetNumber(&(itup)->t_tid,n)
+-#define GIN_TREE_POSTING		((OffsetNumber)0xffff)
++#define GIN_TREE_POSTING		((OffsetNumber)0xffffffff)
+ #define GinIsPostingTree(itup)	(GinGetNPosting(itup) == GIN_TREE_POSTING)
+ #define GinSetPostingTree(itup, blkno)	( GinSetNPosting((itup),GIN_TREE_POSTING), ItemPointerSetBlockNumber(&(itup)->t_tid, blkno) )
+ #define GinGetPostingTree(itup) GinItemPointerGetBlockNumber(&(itup)->t_tid)
+diff --git a/src/include/access/xlog_internal.h b/src/include/access/xlog_internal.h
+index ce9957e..218865a 100644
+--- a/src/include/access/xlog_internal.h
++++ b/src/include/access/xlog_internal.h
+@@ -46,8 +46,8 @@ typedef struct BkpBlock
+ 	RelFileNode node;			/* relation containing block */
+ 	ForkNumber	fork;			/* fork within the relation */
+ 	BlockNumber block;			/* block number */
+-	uint16		hole_offset;	/* number of bytes before "hole" */
+-	uint16		hole_length;	/* number of bytes in "hole" */
++	uint32		hole_offset;	/* number of bytes before "hole" */
++	uint32		hole_length;	/* number of bytes in "hole" */
+ 
+ 	/* ACTUAL BLOCK DATA FOLLOWS AT END OF STRUCT */
+ } BkpBlock;
+diff --git a/src/include/catalog/pg_type.h b/src/include/catalog/pg_type.h
+index e3822fa..4763baf 100644
+--- a/src/include/catalog/pg_type.h
++++ b/src/include/catalog/pg_type.h
+@@ -327,7 +327,7 @@ DATA(insert OID = 26 (	oid		   PGNSP PGUID	4 t b N t t \054 0	 0 1028 oidin oido
+ DESCR("object identifier(oid), maximum 4 billion");
+ #define OIDOID			26
+ 
+-DATA(insert OID = 27 (	tid		   PGNSP PGUID	6 f b U f t \054 0	 0 1010 tidin tidout tidrecv tidsend - - - s p f 0 -1 0 0 _null_ _null_ _null_ ));
++DATA(insert OID = 27 (	tid		   PGNSP PGUID	8 f b U f t \054 0	 0 1010 tidin tidout tidrecv tidsend - - - i p f 0 -1 0 0 _null_ _null_ _null_ ));
+ DESCR("(block, offset), physical location of tuple");
+ #define TIDOID		27
+ 
+diff --git a/src/include/storage/bufpage.h b/src/include/storage/bufpage.h
+index 8c887ca..fead96c 100644
+--- a/src/include/storage/bufpage.h
++++ b/src/include/storage/bufpage.h
+@@ -76,10 +76,10 @@ typedef Pointer Page;
+ /*
+  * location (byte offset) within a page.
+  *
+- * note that this is actually limited to 2^15 because we have limited
+- * ItemIdData.lp_off and ItemIdData.lp_len to 15 bits (see itemid.h).
++ * note that this is actually limited to 2^20 because we have limited
++ * ItemIdData.lp_off to 20 bits. (see itemid.h).
+  */
+-typedef uint16 LocationIndex;
++typedef uint32 LocationIndex;
+ 
+ 
+ /*
+@@ -146,7 +146,7 @@ typedef struct PageHeaderData
+ 	LocationIndex pd_lower;		/* offset to start of free space */
+ 	LocationIndex pd_upper;		/* offset to end of free space */
+ 	LocationIndex pd_special;	/* offset to start of special space */
+-	uint16		pd_pagesize_version;
++	uint32		pd_pagesize_version;
+ 	TransactionId pd_prune_xid; /* oldest prunable XID, or zero if none */
+ 	ItemIdData	pd_linp[1];		/* beginning of line pointer array */
+ } PageHeaderData;
+@@ -252,7 +252,7 @@ typedef PageHeaderData *PageHeader;
+  * however, it can be called on a page that is not stored in a buffer.
+  */
+ #define PageGetPageSize(page) \
+-	((Size) (((PageHeader) (page))->pd_pagesize_version & (uint16) 0xFF00))
++	((Size) (((PageHeader) (page))->pd_pagesize_version & (uint32) 0xFFFFFF00))
+ 
+ /*
+  * PageGetPageLayoutVersion
+@@ -270,7 +270,7 @@ typedef PageHeaderData *PageHeader;
+  */
+ #define PageSetPageSizeAndVersion(page, size, version) \
+ ( \
+-	AssertMacro(((size) & 0xFF00) == (size)), \
++	AssertMacro(((size) & 0xFFFFFF00) == (size)), \
+ 	AssertMacro(((version) & 0x00FF) == (version)), \
+ 	((PageHeader) (page))->pd_pagesize_version = (size) | (version) \
+ )
+diff --git a/src/include/storage/itemid.h b/src/include/storage/itemid.h
+index b8c22aa..2daaf23e 100644
+--- a/src/include/storage/itemid.h
++++ b/src/include/storage/itemid.h
+@@ -23,9 +23,9 @@
+  */
+ typedef struct ItemIdData
+ {
+-	unsigned	lp_off:15,		/* offset to tuple (from start of page) */
++	unsigned	lp_off:20,		/* offset to tuple (from start of page) */
+ 				lp_flags:2,		/* state of item pointer, see below */
+-				lp_len:15;		/* byte length of tuple */
++				lp_len:20;		/* byte length of tuple */
+ } ItemIdData;
+ 
+ typedef ItemIdData *ItemId;
+diff --git a/src/include/storage/off.h b/src/include/storage/off.h
+index e991484..d07c129 100644
+--- a/src/include/storage/off.h
++++ b/src/include/storage/off.h
+@@ -21,12 +21,12 @@
+  * this is a 1-based index into the linp (ItemIdData) array in the
+  * header of each disk page.
+  */
+-typedef uint16 OffsetNumber;
++typedef uint32 OffsetNumber;
+ 
+ #define InvalidOffsetNumber		((OffsetNumber) 0)
+ #define FirstOffsetNumber		((OffsetNumber) 1)
+ #define MaxOffsetNumber			((OffsetNumber) (BLCKSZ / sizeof(ItemIdData)))
+-#define OffsetNumberMask		(0xffff)		/* valid uint16 bits */
++#define OffsetNumberMask		(0xffffffff)		/* valid uint32 bits */
+ 
+ /* ----------------
+  *		support macros
