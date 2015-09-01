@@ -159,6 +159,21 @@ int			max_safe_fds = 32;	/* default if not changed */
 #define FD_TEMPORARY		(1 << 0)	/* T = delete when closed */
 #define FD_XACT_TEMPORARY	(1 << 1)	/* T = delete at eoXact */
 
+/*
+//NMH:
+Vfd is a structure which contains the file descriptor. But it is designed to serve the purpose of Disk based DB.
+For Pmem-mapped Files, we need to design our own MMFD (Mem-Mapped File Descriptors )structure. Such a structure should include following attributes/elements
+1) a pointer mapped to the address of that file in Pmem
+2) Name of file
+3) Size of file
+4) CUrrent offset to locate the position to read/write a byte
+5) Resource Owner
+6) FileFlags
+7) FileMode
+
+I guess, we do not need to maintain a doubly linked list of free MMFD (unlike the case of VFDs)
+since we can maintain such list in Pmem itself and assume that we have plenty of space.
+*/
 typedef struct vfd
 {
 	int			fd;				/* current FD, or VFD_CLOSED if none */
@@ -277,6 +292,20 @@ static int	nextTempTableSpace = 0;
  *
  *--------------------
  */
+/*NMH:
+ * Since we are planning to use Memory mapped file that are mapped into PMem (and not in DRam) we have plenty of space.
+ * This means that we dont need to maintain a doubly linked list of opened files (implementing a replacement policy when
+ * we need to open a new files and memory is not enough). Hence, we also dont need all functions related to operation of doubly linked list i.e.
+ * following functions need to be not called
+ * Delete		   - delete a file from the Lru ring
+ * LruDelete	   - remove a file from the Lru ring and close its FD
+ * Insert		   - put a file at the front of the Lru ring
+ * LruInsert	   - put a file at the front of the Lru ring and open it
+ * ReleaseLruFile  - Release an fd by closing the last entry in the Lru ring
+ * ReleaseLruFiles - Release fd(s) until we're under the max_safe_fds limit
+ * AllocateVfd	   - grab a free (or new) file record (from VfdArray)
+ * FreeVfd		   - free a file record
+ * */
 static void Delete(File file);
 static void LruDelete(File file);
 static void Insert(File file);
@@ -307,11 +336,19 @@ static void walkdir(const char *path,
 static void pre_sync_fname(const char *fname, bool isdir, int elevel);
 #endif
 static void fsync_fname_ext(const char *fname, bool isdir, int elevel);
-
+//**********************************Start of File Synchronization Functions*************************************************************
+/*
+//Naveed Modification Hint (NMH)
+//we dont need synchronization functions (fsync(i.e pg_fsync,pg_fsync_no_writethrough,pg_fsync_writethrough,pg_fdatasync)
+//since we are using the PMem-mapped files. So we need to
+1) check the usage(i.e. being called) of these functions in the source code
+2) Either disable that call OR Provide a wrapper arround these fucntions
+*/
 
 /*
  * pg_fsync --- do fsync with or without writethrough
  */
+
 int
 pg_fsync(int fd)
 {
@@ -460,7 +497,7 @@ fsync_fname(char *fname, bool isdir)
 
 	CloseTransientFile(fd);
 }
-
+//**********************************End of File Synchronization Functions*************************************************************
 
 /*
  * InitFileAccess --- initialize this module during backend startup
@@ -468,6 +505,11 @@ fsync_fname(char *fname, bool isdir)
  * This is called during either normal or standalone backend start.
  * It is *not* called in the postmaster.
  */
+/*
+ * NMH:
+ * We need to modify this function such that at backend startup, our list of memory mapped pointers (i.e. MMFD_list) is empty
+ * Also we need to modify the function "AtProcExit_Files", such that elements in MMFD_list pointing to temporary files are freed/pfreed/de-allocated.
+ * */
 void
 InitFileAccess(void)
 {
@@ -501,6 +543,12 @@ InitFileAccess(void)
  *
  * We assume stdin (FD 0) is available for dup'ing
  */
+/*
+ * NMH:
+ * I think we also dont need functions "count_usable_fds" and "set_max_safe_fds"
+ * since we are assuimng that we are mainting the MMFD_list in Pmem and we have plenty of space we dont need to
+ * worry about number of file descriptors opened at a time.
+ * */
 static void
 count_usable_fds(int max_to_probe, int *usable_fds, int *already_open)
 {
@@ -687,7 +735,8 @@ _dump_lru(void)
 	elog(LOG, "%s", buf);
 }
 #endif   /* FDDEBUG */
-
+//NMH:
+//Removes the file from doubly linked list
 static void
 Delete(File file)
 {
@@ -1016,8 +1065,8 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	DO_DB(elog(LOG, "PathNameOpenFile: success %d",
 			   vfdP->fd));
 
-	Insert(file);
-
+    Insert(file);//insert this file in file descriptor cache "VfdCache"
+    //attribute settings for the virtual file desciptor pointed by vfdp pointer
 	vfdP->fileName = fnamecopy;
 	/* Saved flags are adjusted to be OK for re-opening file */
 	vfdP->fileFlags = fileFlags & ~(O_CREAT | O_TRUNC | O_EXCL);
@@ -1302,7 +1351,7 @@ FileRead(File file, char *buffer, int amount)
 			   amount, buffer));
 
 	returnCode = FileAccess(file);
-	if (returnCode < 0)
+    if (returnCode < 0)//hmmm, if file can not be opened then error is returned
 		return returnCode;
 
 retry:

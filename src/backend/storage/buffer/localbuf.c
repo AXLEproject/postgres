@@ -40,7 +40,7 @@ typedef struct
 int			NLocBuffer = 0;		/* until buffers are initialized */
 
 BufferDesc *LocalBufferDescriptors = NULL;
-Block	   *LocalBufferBlockPointers = NULL;
+Block	   *LocalBufferBlockPointers = NULL;//List of Blocks in Local Buffer
 int32	   *LocalRefCount = NULL;
 
 static int	nextFreeLocalBuf = 0;
@@ -165,7 +165,7 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 		if (++nextFreeLocalBuf >= NLocBuffer)
 			nextFreeLocalBuf = 0;
 
-		bufHdr = GetLocalBufferDescriptor(b);
+		bufHdr = GetLocalBufferDescriptor(b);//here we save the BufferDesc for the victim buffer for eviction
 
 		if (LocalRefCount[b] == 0)
 		{

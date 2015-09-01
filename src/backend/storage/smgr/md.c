@@ -93,8 +93,8 @@
  *	disappear.
  *
  *	The file descriptor pointer (md_fd field) stored in the SMgrRelation
- *	cache is, therefore, just the head of a list of MdfdVec objects, one
- *	per segment.  But note the md_fd pointer can be NULL, indicating
+ *	cache is, therefore, just the head of a list of MdfdVec objects, ******one
+ *	per segment******.  But note the md_fd pointer can be NULL, indicating
  *	relation not open.
  *
  *	Also note that mdfd_chain == NULL does not necessarily mean the relation
@@ -575,7 +575,7 @@ mdopen(SMgrRelation reln, ForkNumber forknum, ExtensionBehavior behavior)
 	if (reln->md_fd[forknum])
 		return reln->md_fd[forknum];
 
-	path = relpath(reln->smgr_rnode, forknum);
+    path = relpath(reln->smgr_rnode, forknum);//prints and returns the path to a relation's file
 
 	fd = PathNameOpenFile(path, O_RDWR | PG_BINARY, 0600);
 
@@ -672,7 +672,8 @@ mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 {
 	off_t		seekpos;
 	int			nbytes;
-	MdfdVec    *v;
+    //MdfdVec *v is a pointer to Megnatic disk file descriptor which points to segment of a file in the disk
+    MdfdVec    *v;
 
 	TRACE_POSTGRESQL_SMGR_MD_READ_START(forknum, blocknum,
 										reln->smgr_rnode.node.spcNode,
@@ -1727,7 +1728,7 @@ _mdfd_getseg(SMgrRelation reln, ForkNumber forknum, BlockNumber blkno,
 	if (!v)
 		return NULL;			/* only possible if EXTENSION_RETURN_NULL */
 
-	targetseg = blkno / ((BlockNumber) RELSEG_SIZE);
+    targetseg = blkno / ((BlockNumber) RELSEG_SIZE);//I dont understand the calculation of targetseg
 	for (nextsegno = 1; nextsegno <= targetseg; nextsegno++)
 	{
 		Assert(nextsegno == v->mdfd_segno + 1);

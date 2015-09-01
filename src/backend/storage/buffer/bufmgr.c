@@ -606,16 +606,22 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	Block		bufBlock;
 	bool		found;
 	bool		isExtend;
-	bool		isLocalBuf = SmgrIsTemp(smgr);
+    //just check if the requested SMgrRelation i.e. smgr is an object local to a backend or shared among multiple backends
+    bool		isLocalBuf = SmgrIsTemp(smgr);//(smgr->rnode->backend==invalidbackend), note that invalidbackend means that Smgr is shared among multiple
+    //backends
 
 	*hit = false;
 
 	/* Make sure we will have room to remember the buffer pin */
+    //Disk buffers are owned by resource owners. To pin/own a new buffer, we need to check if nbuffer owned by the current resource owner are less than
+    //max number of buffer for that owner. If yes, we can pin a new buffer. If not, we need to update the max number buffer for the owner,
+    //and repallocate the buffer with 2 more adittional buffer allocation
 	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
 
-	isExtend = (blockNum == P_NEW);
+    isExtend = (blockNum == P_NEW);//P_NEW mean that a new block is requested to extend/grow the file
 
-	TRACE_POSTGRESQL_BUFFER_READ_START(forkNum, blockNum,
+    //I dont Understand this piece of code
+    TRACE_POSTGRESQL_BUFFER_READ_START(forkNum, blockNum,
 									   smgr->smgr_rnode.node.spcNode,
 									   smgr->smgr_rnode.node.dbNode,
 									   smgr->smgr_rnode.node.relNode,
@@ -628,13 +634,25 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 
 	if (isLocalBuf)
 	{
-		bufHdr = LocalBufferAlloc(smgr, forkNum, blockNum, &found);
-		if (found)
+        /*LocalBufferAlloc CHECKS: that if this request is the first request in this session to allocate a local buffer for the desired block of given relation,
+         *if YES: it initializes the local buffer with desired block of given relation.
+         *If NOT:
+         *      then it CHECKS: wether there is a buffer in disk buffer cache containing the desired block of given relation
+         *      if YES: then return the buffer Descritor for that buffer and set found to TRUE.
+         *      if NO: It needs to bring in a new page in the difk buffer cache, containing the desired block of given relation.
+         *              For that it needs to select a victim for eviction using sweep clock algorithm. The victim buffer is selected
+         *              and if it is dirty, it is written out to disk before eviction. Space for new buffer is allocated but not filled with required data.
+         *              Then Hashtable (Buftag-->local buffer index for this session)
+         *              is updated by removing the entry for evicted buffer ID and adding the entry for new BUffer ID. Now return the buffer descriptor
+         *              of buffer containing the desired block of given relation. At the same time set found to FALSE.
+         */
+        bufHdr = LocalBufferAlloc(smgr, forkNum, blockNum, &found);
+        if (found)//if found is tree, it means there was no read from disk and there was hit in disk buffer for local block
 			pgBufferUsage.local_blks_hit++;
-		else
+        else//otherwise, increment the number of local block read from the disk
 			pgBufferUsage.local_blks_read++;
 	}
-	else
+    else//for the timing, I am skipping this else block (for shared buffer case) assuming that it works in a similiar way as for local buffer case
 	{
 		/*
 		 * lookup the buffer.  IO_IN_PROGRESS is set if the requested block is
@@ -748,12 +766,18 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	 */
 	Assert(!(bufHdr->flags & BM_VALID));		/* spinlock not needed */
 
-	bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
+    //if condition is true it means that bufHdr is descriptor of a local Buffer(local to current session)
+    //since desired block was found in a local block. If condition is false, it means that bufHdr is a descriptor
+    //of shared Buffer (shared among sessions)
+    bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
 
 	if (isExtend)
 	{
 		/* new buffers are zero-filled */
-		MemSet((char *) bufBlock, 0, BLCKSZ);
+        MemSet((char *) bufBlock, 0, BLCKSZ);
+        //IMPORTANT FOR PMemory: Here we need to modify the BLCKSZ....but here is used only to desctibe that how many zeros are to be filled in.
+        //We need to look into description of "Block", the class of bufBlock to find out what is the size of actual block read and written to Disk
+
 		/* don't set checksum for all-zero page */
 		smgrextend(smgr, forkNum, blockNum, (char *) bufBlock, false);
 	}
@@ -763,7 +787,10 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 		 * Read in the page, unless the caller intends to overwrite it and
 		 * just wants us to allocate a buffer.
 		 */
-		if (mode == RBM_ZERO_AND_LOCK || mode == RBM_ZERO_AND_CLEANUP_LOCK)
+        if (mode == RBM_ZERO_AND_LOCK || mode == RBM_ZERO_AND_CLEANUP_LOCK)
+            /*
+             * in these two modes, page is initilaized with zero in the disk buffer
+            */
 			MemSet((char *) bufBlock, 0, BLCKSZ);
 		else
 		{
@@ -773,8 +800,10 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 			if (track_io_timing)
 				INSTR_TIME_SET_CURRENT(io_start);
 
-			smgrread(smgr, forkNum, blockNum, (char *) bufBlock);
+            //read a particular block (i.e. blockNum) from a relation(i.e. smgr) (Naveed: in the disk) into the supplied buffer.
+            smgrread(smgr, forkNum, blockNum, (char *) bufBlock);//smgread-->mdread-->FileRead-->read (Linus Syscall)
 
+            //A piece of code for tracking the time consumed during the read operation
 			if (track_io_timing)
 			{
 				INSTR_TIME_SET_CURRENT(io_time);
@@ -3433,8 +3462,10 @@ WaitIO(volatile BufferDesc *buf)
 static bool
 StartBufferIO(volatile BufferDesc *buf, bool forInput)
 {
-	Assert(!InProgressBuf);
+    Assert(!InProgressBuf);//just check if I/O for anyother buffer is not in progress,
+    //InProgressBuf contains the BufferDesc of buffer for which I/O is in progress
 
+    //wait until you sucessfully get io_in_progress lock of buffer and spinlock on buffer.
 	for (;;)
 	{
 		/*
@@ -3460,15 +3491,16 @@ StartBufferIO(volatile BufferDesc *buf, bool forInput)
 	}
 
 	/* Once we get here, there is definitely no I/O active on this buffer */
-
-	if (forInput ? (buf->flags & BM_VALID) : !(buf->flags & BM_DIRTY))
+    //if someone has already loaded input into this buffer (BM_Valid) or someone has already modified its content (BM_Dirty)....
+    //we can not mark the buffer to be set busy by us
+    if (forInput ? (buf->flags & BM_VALID) : !(buf->flags & BM_DIRTY))
 	{
 		/* someone else already did the I/O */
 		UnlockBufHdr(buf);
 		LWLockRelease(buf->io_in_progress_lock);
 		return false;
 	}
-
+    //else, we sucessfully mark the buffer to be busy in I/O
 	buf->flags |= BM_IO_IN_PROGRESS;
 
 	UnlockBufHdr(buf);

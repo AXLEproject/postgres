@@ -612,7 +612,7 @@ smgrprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
 }
 
 /*
- *	smgrread() -- read a particular block from a relation into the supplied
+ *	smgrread() -- read a particular block from a relation(Naveed: in the disk) into the supplied
  *				  buffer.
  *
  *		This routine is called from the buffer manager in order to
@@ -623,7 +623,9 @@ void
 smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 		 char *buffer)
 {
-	(*(smgrsw[reln->smgr_which].smgr_read)) (reln, forknum, blocknum, buffer);
+    (*(smgrsw[reln->smgr_which].smgr_read)) (reln, forknum, blocknum, buffer);
+    //Naveed: How does it read a block from disk into buffer, I dont understand the details
+    //I can not find the defination of function smgr_read
 }
 
 /*

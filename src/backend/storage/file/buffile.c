@@ -12,9 +12,9 @@
  * NOTES:
  *
  * BufFiles provide a very incomplete emulation of stdio atop virtual Files
- * (as managed by fd.c).  Currently, we only support the buffered-I/O
+ * (as managed by fd.c).*****  Currently, we only support the buffered-I/O
  * aspect of stdio: a read or write of the low-level File occurs only
- * when the buffer is filled or emptied.  This is an even bigger win
+ * when the buffer is filled or emptied. **** This is an even bigger win
  * for virtual Files than for ordinary kernel files, since reducing the
  * frequency with which a virtual File is touched reduces "thrashing"
  * of opening/closing file descriptors.
@@ -48,7 +48,7 @@
  * multiple tablespaces when available.
  */
 #define MAX_PHYSICAL_FILESIZE	0x40000000
-#define BUFFILE_SEG_SIZE		(MAX_PHYSICAL_FILESIZE / BLCKSZ)
+#define BUFFILE_SEG_SIZE		(MAX_PHYSICAL_FILESIZE / BLCKSZ)//by default BLCKSZ is 8192 bytes
 
 /*
  * This data structure represents a buffered file that consists of one or
@@ -123,7 +123,7 @@ makeBufFile(File firstfile)
 }
 
 /*
- * Add another component temp file.
+ * Add another component temp file, pfile to Buffile *file.
  */
 static void
 extendBufFile(BufFile *file)
@@ -141,10 +141,8 @@ extendBufFile(BufFile *file)
 
 	CurrentResourceOwner = oldowner;
 
-	file->files = (File *) repalloc(file->files,
-									(file->numFiles + 1) * sizeof(File));
-	file->offsets = (off_t *) repalloc(file->offsets,
-									   (file->numFiles + 1) * sizeof(off_t));
+	file->files = (File *) repalloc(file->files,(file->numFiles + 1) * sizeof(File));
+	file->offsets = (off_t *) repalloc(file->offsets,(file->numFiles + 1) * sizeof(off_t));
 	file->files[file->numFiles] = pfile;
 	file->offsets[file->numFiles] = 0L;
 	file->numFiles++;
