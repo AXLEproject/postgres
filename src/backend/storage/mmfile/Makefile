@@ -8,7 +8,7 @@
 #
 #-------------------------------------------------------------------------
 
-subdir = src/backend/storage/file
+subdir = src/backend/storage/mmfile
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
