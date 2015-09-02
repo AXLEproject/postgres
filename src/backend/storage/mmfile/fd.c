@@ -55,7 +55,8 @@
  *
  *-------------------------------------------------------------------------
  */
-
+//added by Naveed
+#include <sys/mman.h>
 #include "postgres.h"
 
 #include <sys/file.h>
@@ -159,9 +160,29 @@ int			max_safe_fds = 32;	/* default if not changed */
 #define FD_TEMPORARY		(1 << 0)	/* T = delete when closed */
 #define FD_XACT_TEMPORARY	(1 << 1)	/* T = delete at eoXact */
 
+/*
+//NMH:
+Vfd is a structure which contains the file descriptor. But it is designed to serve the purpose of Disk based DB.
+For Pmem-mapped Files, we need to design our own MMFD (Mem-Mapped File Descriptors )structure. Such a structure should include following attributes/elements
+1) a pointer mapped to the address of that file in Pmem
+2) Name of file
+3) Size of file
+4) CUrrent offset to locate the position to read/write a byte
+5) Resource Owner
+6) FileFlags
+7) FileMode
+
+I guess, we do not need to maintain a doubly linked list of free MMFD (unlike the case of VFDs)
+since we can maintain such list in Pmem itself and assume that we have plenty of space.
+*/
 typedef struct vfd
 {
 	int			fd;				/* current FD, or VFD_CLOSED if none */
+    /*
+     * Modified
+    */
+    void        *PM_ptr;            /*Pointer of the mem maped file in Pmem, NULL if not yet mapped, added by Naveed*/
+    int         fileLength;     //Length of memory mapped file in Bytes, added by Naveed
 	unsigned short fdstate;		/* bitflags for VFD's state */
 	ResourceOwner resowner;		/* owner, for automatic cleanup */
 	File		nextFree;		/* link to next free VFD, if in freelist */
@@ -277,6 +298,20 @@ static int	nextTempTableSpace = 0;
  *
  *--------------------
  */
+/*NMH:
+ * Since we are planning to use Memory mapped file that are mapped into PMem (and not in DRam) we have plenty of space.
+ * This means that we dont need to maintain a doubly linked list of opened files (implementing a replacement policy when
+ * we need to open a new files and memory is not enough). Hence, we also dont need all functions related to operation of doubly linked list i.e.
+ * following functions need to be not called
+ * Delete		   - delete a file from the Lru ring
+ * LruDelete	   - remove a file from the Lru ring and close its FD
+ * Insert		   - put a file at the front of the Lru ring
+ * LruInsert	   - put a file at the front of the Lru ring and open it
+ * ReleaseLruFile  - Release an fd by closing the last entry in the Lru ring
+ * ReleaseLruFiles - Release fd(s) until we're under the max_safe_fds limit
+ * AllocateVfd	   - grab a free (or new) file record (from VfdArray)
+ * FreeVfd		   - free a file record
+ * */
 static void Delete(File file);
 static void LruDelete(File file);
 static void Insert(File file);
@@ -307,11 +342,19 @@ static void walkdir(const char *path,
 static void pre_sync_fname(const char *fname, bool isdir, int elevel);
 #endif
 static void fsync_fname_ext(const char *fname, bool isdir, int elevel);
-
+//**********************************Start of File Synchronization Functions*************************************************************
+/*
+//Naveed Modification Hint (NMH)
+//we dont need synchronization functions (fsync(i.e pg_fsync,pg_fsync_no_writethrough,pg_fsync_writethrough,pg_fdatasync)
+//since we are using the PMem-mapped files. So we need to
+1) check the usage(i.e. being called) of these functions in the source code
+2) Either disable that call OR Provide a wrapper arround these fucntions
+*/
 
 /*
  * pg_fsync --- do fsync with or without writethrough
  */
+
 int
 pg_fsync(int fd)
 {
@@ -460,7 +503,7 @@ fsync_fname(char *fname, bool isdir)
 
 	CloseTransientFile(fd);
 }
-
+//**********************************End of File Synchronization Functions*************************************************************
 
 /*
  * InitFileAccess --- initialize this module during backend startup
@@ -468,6 +511,11 @@ fsync_fname(char *fname, bool isdir)
  * This is called during either normal or standalone backend start.
  * It is *not* called in the postmaster.
  */
+/*
+ * NMH:
+ * We need to modify this function such that at backend startup, our list of memory mapped pointers (i.e. MMFD_list) is empty
+ * Also we need to modify the function "AtProcExit_Files", such that elements in MMFD_list pointing to temporary files are freed/pfreed/de-allocated.
+ * */
 void
 InitFileAccess(void)
 {
@@ -501,6 +549,12 @@ InitFileAccess(void)
  *
  * We assume stdin (FD 0) is available for dup'ing
  */
+/*
+ * NMH:
+ * I think we also dont need functions "count_usable_fds" and "set_max_safe_fds"
+ * since we are assuimng that we are mainting the MMFD_list in Pmem and we have plenty of space we dont need to
+ * worry about number of file descriptors opened at a time.
+ * */
 static void
 count_usable_fds(int max_to_probe, int *usable_fds, int *already_open)
 {
@@ -568,7 +622,9 @@ count_usable_fds(int max_to_probe, int *usable_fds, int *already_open)
 
 	/* release the files we opened */
 	for (j = 0; j < used; j++)
+    {
 		close(fd[j]);
+    }
 
 	pfree(fd);
 
@@ -687,7 +743,8 @@ _dump_lru(void)
 	elog(LOG, "%s", buf);
 }
 #endif   /* FDDEBUG */
-
+//NMH:
+//Removes the file from doubly linked list
 static void
 Delete(File file)
 {
@@ -727,9 +784,13 @@ LruDelete(File file)
 	Assert(vfdP->seekPos != (off_t) -1);
 
 	/* close the file */
-	if (close(vfdP->fd))
+    //unmap the file before closing it, and make sure that unmaping is sucessfull
+    Assert(munmap(vfdP->PM_ptr,vfdP->fileLength)==0);//added by Naveed
+    //comment following close statement since file was already closed immediately after memory mapping
+    /*//commented by Naveed
+    if (close(vfdP->fd))
 		elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
-
+    */
 	--nfile;
 	vfdP->fd = VFD_CLOSED;
 }
@@ -982,6 +1043,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	char	   *fnamecopy;
 	File		file;
 	Vfd		   *vfdP;
+    size_t      len_mm;
 
 	DO_DB(elog(LOG, "PathNameOpenFile: %s %x %o",
 			   fileName, fileFlags, fileMode));
@@ -1012,12 +1074,30 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 		errno = save_errno;
 		return -1;
 	}
+
+
 	++nfile;
 	DO_DB(elog(LOG, "PathNameOpenFile: success %d",
 			   vfdP->fd));
 
-	Insert(file);
-
+    Insert(file);//insert this file in file descriptor cache "VfdCache"
+    //attribute settings for the virtual file desciptor pointed by vfdp pointer
+    /******************************************************************************************************
+     * Modified:
+    */
+    //calculates the length of file
+    len_mm=lseek(vfdP->fd, 0L, SEEK_END);
+    //set the Length of File in vfdP
+    vfdP->fileLength=len_mm;
+    //map the file:
+    //void *mmap(void *addr, size_t lengthint " prot ", int " flags ,int fd, off_t offset);
+    vfdP->PM_ptr=mmap(NULL,len_mm,PROT_READ,fileFlags,vfdP->fd,0);//map the file and return the pointer to PM_ptr
+    Assert(vfdP->PM_ptr !=MAP_FAILED);//check to make sure that mapping is sucessfull
+    //Close the File:
+    Assert(close(vfdP->fd)==0);//make sure that file is sucessfully closed
+    //******************************************************************************************************
+    elog(DEBUG5, "PathNameOpenFile: mmap success, pointer: %p",
+                   vfdP->PM_ptr);
 	vfdP->fileName = fnamecopy;
 	/* Saved flags are adjusted to be OK for re-opening file */
 	vfdP->fileFlags = fileFlags & ~(O_CREAT | O_TRUNC | O_EXCL);
@@ -1026,6 +1106,8 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	vfdP->fileSize = 0;
 	vfdP->fdstate = 0x0;
 	vfdP->resowner = NULL;
+
+
 
 	return file;
 }
@@ -1182,10 +1264,14 @@ FileClose(File file)
 	{
 		/* remove the file from the lru ring */
 		Delete(file);
-
+        //unmap the file before closing it, and make sure that unmaping was sucessfull
+        Assert(munmap(vfdP->PM_ptr,vfdP->fileLength)==0);//added by Naveed
 		/* close the file */
+        //comment following close statement since file was immediately closed after memory mapping
+        /*//commented by Naveed
 		if (close(vfdP->fd))
 			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
+            */
 
 		--nfile;
 		vfdP->fd = VFD_CLOSED;
@@ -1293,20 +1379,35 @@ int
 FileRead(File file, char *buffer, int amount)
 {
 	int			returnCode;
+    int         loop_var;
 
 	Assert(FileIsValid(file));
 
-	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
+    DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
-			   amount, buffer));
+               amount, buffer));
 
-	returnCode = FileAccess(file);
-	if (returnCode < 0)
+    returnCode = FileAccess(file);//this is all about managing the doubly linked list
+    if (returnCode < 0)//hmmm, if file can not be opened then error is returned
 		return returnCode;
 
 retry:
-	returnCode = read(VfdCache[file].fd, buffer, amount);
+    //********************************************************
+    /*MOdified*/
+    //returnCode = read(VfdCache[file].fd, buffer, amount);//commented by Naveed
+
+    //reading from the memory mapped file
+    //Added by Naveed
+    returnCode=0;
+
+    for (loop_var=0;loop_var<amount;loop_var++)
+    {
+        //read a byte from PM_ptr+seekPos+i
+        buffer[loop_var]=*((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ));
+        returnCode+=1;
+    }
+   //********************************************************
 
 	if (returnCode >= 0)
 		VfdCache[file].seekPos += returnCode;
@@ -1348,6 +1449,7 @@ int
 FileWrite(File file, char *buffer, int amount)
 {
 	int			returnCode;
+    int         loop_var;
 
 	Assert(FileIsValid(file));
 
@@ -1387,7 +1489,24 @@ FileWrite(File file, char *buffer, int amount)
 
 retry:
 	errno = 0;
-	returnCode = write(VfdCache[file].fd, buffer, amount);
+
+    //********************************************************
+    /*MOdified*/
+    //returnCode = write(VfdCache[file].fd, buffer, amount);//commented by Naveed
+
+    //Writing to memory mapped file
+    //Added by Naveed
+    returnCode=0;
+
+    for (loop_var=0;loop_var<amount;loop_var++)
+    {
+        //Write a byte from Buffer to memory location pointed by PM_ptr+seekPos+i
+        *((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ))=buffer[loop_var];
+        returnCode+=1;
+    }
+   //********************************************************
+
+
 
 	/* if write didn't set errno, assume problem is no disk space */
 	if (returnCode != amount && errno == 0)

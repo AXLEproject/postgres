@@ -38,6 +38,10 @@ lib*.pc
 /Debug/
 /Release/
 /tmp_install/
-
+mmpostgress.config
+mmpostgress.creator
+mmpostgress.creator.user
+mmpostgress.files
+mmpostgress.includes
 # Additional ignore
 build/
