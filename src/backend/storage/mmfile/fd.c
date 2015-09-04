@@ -1586,7 +1586,8 @@ FileSeek(File file, off_t offset, int whence)
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
 			   (int64) offset, whence));
-
+    //NOTE: Added by Naveed
+    //This if else is used in orignal postgres just to minimize the syscalls. We can collapse them into single situation to reduce code size
 	if (FileIsNotOpen(file))
 	{
 		switch (whence)
@@ -1604,8 +1605,10 @@ FileSeek(File file, off_t offset, int whence)
 				returnCode = FileAccess(file);
 				if (returnCode < 0)
 					return returnCode;
-				VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-											   offset, whence);
+                //commented by Naveed
+                //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//we need to modify this
+                //Added by Naveed
+                VfdCache[file].seekPos=VfdCache[file].fileLength+offset;
 				break;
 			default:
 				elog(ERROR, "invalid whence: %d", whence);
@@ -1621,17 +1624,23 @@ FileSeek(File file, off_t offset, int whence)
 					elog(ERROR, "invalid seek offset: " INT64_FORMAT,
 						 (int64) offset);
 				if (VfdCache[file].seekPos != offset)
-					VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-												   offset, whence);
+                    //commented by Naveed
+                    //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                    //Added by Naveed
+                    VfdCache[file].seekPos = offset;
 				break;
 			case SEEK_CUR:
 				if (offset != 0 || VfdCache[file].seekPos == FileUnknownPos)
-					VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-												   offset, whence);
+                    //commented by Naveed
+                    //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                    //Added by Naveed
+                    VfdCache[file].seekPos+= offset;
 				break;
 			case SEEK_END:
-				VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-											   offset, whence);
+                //commented by Naveed
+                //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                //Added by Naveed
+                VfdCache[file].seekPos=VfdCache[file].fileLength+offset;
 				break;
 			default:
 				elog(ERROR, "invalid whence: %d", whence);
@@ -1669,7 +1678,17 @@ FileTruncate(File file, off_t offset)
 	if (returnCode < 0)
 		return returnCode;
 
-	returnCode = ftruncate(VfdCache[file].fd, offset);
+    //commented by Naveed
+    //returnCode = ftruncate(VfdCache[file].fd, offset);
+    returnCode=-1;//set returnCode to failure
+    //Do memory RE mapping of already memory mapped file, (mapped to VfdCache[file].PM_ptr), to a new offset (i.e truncate or extend)
+    //and make sure that new mapping is mapped to same old pointer (i.e. VfdCache[file].PM_ptr)
+    //Assert(mremap(VfdCache[file].PM_ptr,VfdCache[file].fileLength,offset,MREMAP_FIXED, VfdCache[file].PM_ptr)!=MAP_FAILED);
+    Assert(VfdCache[file].PM_ptr==mremap(VfdCache[file].PM_ptr,VfdCache[file].fileLength,offset,MREMAP_FIXED, VfdCache[file].PM_ptr));
+    //if sucessfull, set returnCode to 0
+    returnCode=0;
+    //Added by Naveed
+
 
 	if (returnCode == 0 && VfdCache[file].fileSize > offset)
 	{

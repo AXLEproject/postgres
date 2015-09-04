@@ -108,6 +108,8 @@
  *	All MdfdVec objects are palloc'd in the MdCxt memory context.
  */
 
+
+//an object of this struct represents one Segment of a Relation
 typedef struct _MdfdVec
 {
 	File		mdfd_vfd;		/* fd number in fd.c's pool */
@@ -510,7 +512,7 @@ mdextend(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 						relpath(reln->smgr_rnode, forknum),
 						InvalidBlockNumber)));
 
-	v = _mdfd_getseg(reln, forknum, blocknum, skipFsync, EXTENSION_CREATE);
+    v = _mdfd_getseg(reln, forknum, blocknum, skipFsync, EXTENSION_CREATE);//I dont understand this call back to mdfd_extend: Naveed
 
 	seekpos = (off_t) BLCKSZ *(blocknum % ((BlockNumber) RELSEG_SIZE));
 
@@ -557,6 +559,9 @@ mdextend(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 /*
  *	mdopen() -- Open the specified relation.
  *
+ * Open the "forknum" segment of relation "reln"(which exists in a file on the disk)
+ * according to "behaviour" and return the pointer to magnetic disk file descriptor
+ *
  * Note we only open the first segment, when there are multiple segments.
  *
  * If first segment is not present, either ereport or return NULL according
@@ -571,7 +576,7 @@ mdopen(SMgrRelation reln, ForkNumber forknum, ExtensionBehavior behavior)
 	char	   *path;
 	File		fd;
 
-	/* No work if already open */
+    /* No work if required fork of given relation is already open */
 	if (reln->md_fd[forknum])
 		return reln->md_fd[forknum];
 
@@ -668,7 +673,7 @@ mdprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
  */
 void
 mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-	   char *buffer)
+       char *buffer)
 {
 	off_t		seekpos;
 	int			nbytes;
@@ -681,19 +686,21 @@ mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
 										reln->smgr_rnode.node.relNode,
 										reln->smgr_rnode.backend);
 
-	v = _mdfd_getseg(reln, forknum, blocknum, false, EXTENSION_FAIL);
+    v = _mdfd_getseg(reln, forknum, blocknum, false, EXTENSION_FAIL);//This is tricky part, and does most job here
+    //calculate seek position//offset within the corresponding file to be read for acquiring the given blocknum
+    seekpos = (off_t) BLCKSZ *(blocknum % ((BlockNumber) RELSEG_SIZE));
 
-	seekpos = (off_t) BLCKSZ *(blocknum % ((BlockNumber) RELSEG_SIZE));
-
+    //make sure that seek position/oofset is less than maximum allowed size for a file
 	Assert(seekpos < (off_t) BLCKSZ * RELSEG_SIZE);
 
-	if (FileSeek(v->mdfd_vfd, seekpos, SEEK_SET) != seekpos)
+
+    if (FileSeek(v->mdfd_vfd, seekpos, SEEK_SET) != seekpos)//update the seekpos attribute of corresponding file
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("could not seek to block %u in file \"%s\": %m",
 						blocknum, FilePathName(v->mdfd_vfd))));
 
-	nbytes = FileRead(v->mdfd_vfd, buffer, BLCKSZ);
+    nbytes = FileRead(v->mdfd_vfd, buffer, BLCKSZ);//read a block from the specified file
 
 	TRACE_POSTGRESQL_SMGR_MD_READ_DONE(forknum, blocknum,
 									   reln->smgr_rnode.node.spcNode,
@@ -835,10 +842,19 @@ mdnblocks(SMgrRelation reln, ForkNumber forknum)
 
 	for (;;)
 	{
-		nblocks = _mdnblocks(reln, forknum, v);
+        nblocks = _mdnblocks(reln, forknum, v);//gives number of blocks stored in ONE Disk File;
+        /*
+         * One Disk file can contain maximum of RELSEG_SIZE number of blocks.
+         * A real Relation or Table having a size greater than RELSEG_Size is  consisted of multiple Disk Files or segments (One and same thing).
+         * A Relation consisting of 2 completely filled segments/disk files (each contating RELSEG_SIZE number of blocks)
+         * and a third partially filled segment looks like following figure
+         * ============================================================================================
+         * || RELSEG_SIZE # of blocks || RELSEG_SIZE # of blocks || X # of blocks where x<RELSEG_SIZE||
+         * ============================================================================================
+        */
 		if (nblocks > ((BlockNumber) RELSEG_SIZE))
 			elog(FATAL, "segment too big");
-		if (nblocks < ((BlockNumber) RELSEG_SIZE))
+        if (nblocks < ((BlockNumber) RELSEG_SIZE))//if this is last partially filled segment
 			return (segno * ((BlockNumber) RELSEG_SIZE)) + nblocks;
 
 		/*
@@ -1728,7 +1744,7 @@ _mdfd_getseg(SMgrRelation reln, ForkNumber forknum, BlockNumber blkno,
 	if (!v)
 		return NULL;			/* only possible if EXTENSION_RETURN_NULL */
 
-    targetseg = blkno / ((BlockNumber) RELSEG_SIZE);//I dont understand the calculation of targetseg
+    targetseg = blkno / ((BlockNumber) RELSEG_SIZE);//it is clear
 	for (nextsegno = 1; nextsegno <= targetseg; nextsegno++)
 	{
 		Assert(nextsegno == v->mdfd_segno + 1);
@@ -1751,20 +1767,20 @@ _mdfd_getseg(SMgrRelation reln, ForkNumber forknum, BlockNumber blkno,
 			 */
 			if (behavior == EXTENSION_CREATE || InRecovery)
 			{
-				if (_mdnblocks(reln, forknum, v) < RELSEG_SIZE)
+                if (_mdnblocks(reln, forknum, v) < RELSEG_SIZE)//chechk number of blocks in currents segment
 				{
+                    //if number of blocks in currents segment is less than maximum limit
+                    //allocate BLCKSZ memory
 					char	   *zerobuf = palloc0(BLCKSZ);
 
-					mdextend(reln, forknum,
-							 nextsegno * ((BlockNumber) RELSEG_SIZE) - 1,
-							 zerobuf, skipFsync);
+                    mdextend(reln, forknum,nextsegno * ((BlockNumber) RELSEG_SIZE) - 1,zerobuf, skipFsync);
 					pfree(zerobuf);
-				}
+                }//if maximum limit for number of blocks in current segment are reached, create a new segment
 				v->mdfd_chain = _mdfd_openseg(reln, forknum, +nextsegno, O_CREAT);
 			}
 			else
 			{
-				/* We won't create segment if not existent */
+                /* We won't create segment if not existent */
 				v->mdfd_chain = _mdfd_openseg(reln, forknum, nextsegno, 0);
 			}
 			if (v->mdfd_chain == NULL)
@@ -1785,7 +1801,7 @@ _mdfd_getseg(SMgrRelation reln, ForkNumber forknum, BlockNumber blkno,
 }
 
 /*
- * Get number of blocks present in a single disk file
+ * Get number of blocks present in a single disk file (or segment, its same thing)
  */
 static BlockNumber
 _mdnblocks(SMgrRelation reln, ForkNumber forknum, MdfdVec *seg)
