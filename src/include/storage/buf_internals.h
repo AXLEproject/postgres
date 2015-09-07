@@ -144,7 +144,9 @@ typedef struct BufferDesc
 
 	slock_t		buf_hdr_lock;	/* protects the above fields */
 
-	int			buf_id;			/* buffer's index number (from 0) */
+    int			buf_id;			/* buffer's index number (from 0)  or id*/
+    //added by Naveed
+    //void        *pmfs_mmap_ptr;//pointer to the memory mapped page held by this bufferDesc/Mmap_pointer Descriptor
 	int			freeNext;		/* link in freelist chain */
 
 	LWLock	   *io_in_progress_lock;	/* to wait for I/O to complete */

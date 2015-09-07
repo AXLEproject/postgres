@@ -55,7 +55,8 @@
  *
  *-------------------------------------------------------------------------
  */
-
+//added by Naveed
+#include <sys/mman.h>
 #include "postgres.h"
 
 #include <sys/file.h>
@@ -177,6 +178,11 @@ since we can maintain such list in Pmem itself and assume that we have plenty of
 typedef struct vfd
 {
 	int			fd;				/* current FD, or VFD_CLOSED if none */
+    /*
+     * Modified
+    */
+    void        *PM_ptr;            /*Pointer of the mem maped file in Pmem, NULL if not yet mapped, added by Naveed*/
+    int         fileLength;     //Length of memory mapped file in Bytes, added by Naveed
 	unsigned short fdstate;		/* bitflags for VFD's state */
 	ResourceOwner resowner;		/* owner, for automatic cleanup */
 	File		nextFree;		/* link to next free VFD, if in freelist */
@@ -616,7 +622,9 @@ count_usable_fds(int max_to_probe, int *usable_fds, int *already_open)
 
 	/* release the files we opened */
 	for (j = 0; j < used; j++)
+    {
 		close(fd[j]);
+    }
 
 	pfree(fd);
 
@@ -776,9 +784,13 @@ LruDelete(File file)
 	Assert(vfdP->seekPos != (off_t) -1);
 
 	/* close the file */
-	if (close(vfdP->fd))
+    //unmap the file before closing it, and make sure that unmaping is sucessfull
+    Assert(munmap(vfdP->PM_ptr,vfdP->fileLength)==0);//added by Naveed
+    //comment following close statement since file was already closed immediately after memory mapping
+    /*//commented by Naveed
+    if (close(vfdP->fd))
 		elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
-
+    */
 	--nfile;
 	vfdP->fd = VFD_CLOSED;
 }
@@ -1031,6 +1043,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	char	   *fnamecopy;
 	File		file;
 	Vfd		   *vfdP;
+    size_t      len_mm;
 
 	DO_DB(elog(LOG, "PathNameOpenFile: %s %x %o",
 			   fileName, fileFlags, fileMode));
@@ -1061,12 +1074,30 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 		errno = save_errno;
 		return -1;
 	}
+
+
 	++nfile;
 	DO_DB(elog(LOG, "PathNameOpenFile: success %d",
 			   vfdP->fd));
 
     Insert(file);//insert this file in file descriptor cache "VfdCache"
     //attribute settings for the virtual file desciptor pointed by vfdp pointer
+    /******************************************************************************************************
+     * Modified:
+    */
+    //calculates the length of file
+    len_mm=lseek(vfdP->fd, 0L, SEEK_END);
+    //set the Length of File in vfdP
+    vfdP->fileLength=len_mm;
+    //map the file:
+    //void *mmap(void *addr, size_t lengthint " prot ", int " flags ,int fd, off_t offset);
+    vfdP->PM_ptr=mmap(NULL,len_mm,PROT_READ,fileFlags,vfdP->fd,0);//map the file and return the pointer to PM_ptr
+    Assert(vfdP->PM_ptr !=MAP_FAILED);//check to make sure that mapping is sucessfull
+    //Close the File:
+    Assert(close(vfdP->fd)==0);//make sure that file is sucessfully closed
+    //******************************************************************************************************
+    elog(DEBUG5, "PathNameOpenFile: mmap success, pointer: %p",
+                   vfdP->PM_ptr);
 	vfdP->fileName = fnamecopy;
 	/* Saved flags are adjusted to be OK for re-opening file */
 	vfdP->fileFlags = fileFlags & ~(O_CREAT | O_TRUNC | O_EXCL);
@@ -1075,6 +1106,8 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	vfdP->fileSize = 0;
 	vfdP->fdstate = 0x0;
 	vfdP->resowner = NULL;
+
+
 
 	return file;
 }
@@ -1231,10 +1264,14 @@ FileClose(File file)
 	{
 		/* remove the file from the lru ring */
 		Delete(file);
-
+        //unmap the file before closing it, and make sure that unmaping was sucessfull
+        Assert(munmap(vfdP->PM_ptr,vfdP->fileLength)==0);//added by Naveed
 		/* close the file */
+        //comment following close statement since file was immediately closed after memory mapping
+        /*//commented by Naveed
 		if (close(vfdP->fd))
 			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
+            */
 
 		--nfile;
 		vfdP->fd = VFD_CLOSED;
@@ -1337,37 +1374,124 @@ FilePrefetch(File file, off_t offset, int amount)
 	return 0;
 #endif
 }
+//Added by Naveed
+int FileRead(File file, char **buffer, int amount)
+{
+    int			returnCode;
+    int         loop_var;
 
-int
-FileRead(File file, char *buffer, int amount)
+    Assert(FileIsValid(file));
+
+    DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
+               file, VfdCache[file].fileName,
+               (int64) VfdCache[file].seekPos,
+               amount, buffer));
+
+    returnCode = FileAccess(file);//this is all about managing the doubly linked list
+    if (returnCode < 0)//hmmm, if file can not be opened then error is returned
+        return returnCode;
+
+retry:
+    //********************************************************
+    /*MOdified*/
+    //returnCode = read(VfdCache[file].fd, buffer, amount);//commented by Naveed
+
+    //reading from the memory mapped file
+    //Added by Naveed
+    returnCode=0;
+    *buffer=(char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos);
+    returnCode=amount;
+    /*
+    for (loop_var=0;loop_var<amount;loop_var++)
+    {
+        //read a byte from PM_ptr+seekPos+i
+        buffer[loop_var]=*((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ));
+        returnCode+=1;
+    }*/
+   //********************************************************
+
+    if (returnCode >= 0)
+        VfdCache[file].seekPos += returnCode;
+    else
+    {
+        /*
+         * Windows may run out of kernel buffers and return "Insufficient
+         * system resources" error.  Wait a bit and retry to solve it.
+         *
+         * It is rumored that EINTR is also possible on some Unix filesystems,
+         * in which case immediate retry is indicated.
+         */
+#ifdef WIN32
+        DWORD		error = GetLastError();
+
+        switch (error)
+        {
+            case ERROR_NO_SYSTEM_RESOURCES:
+                pg_usleep(1000L);
+                errno = EINTR;
+                break;
+            default:
+                _dosmaperr(error);
+                break;
+        }
+#endif
+        /* OK to retry if interrupted */
+        if (errno == EINTR)
+            goto retry;
+
+        /* Trouble, so assume we don't know the file position anymore */
+        VfdCache[file].seekPos = FileUnknownPos;
+    }
+
+    return returnCode;
+}
+
+/*
+ * //commented by naveed
+int FileRead(File file, char *buffer, int amount)
 {
 	int			returnCode;
+    int         loop_var;
 
 	Assert(FileIsValid(file));
 
-	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
+    DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
-			   amount, buffer));
+               amount, buffer));
 
-	returnCode = FileAccess(file);
+    returnCode = FileAccess(file);//this is all about managing the doubly linked list
     if (returnCode < 0)//hmmm, if file can not be opened then error is returned
 		return returnCode;
 
 retry:
-	returnCode = read(VfdCache[file].fd, buffer, amount);
+    //====================================================
+    //====MOdified
+    //returnCode = read(VfdCache[file].fd, buffer, amount);//commented by Naveed
+
+    //reading from the memory mapped file
+    //Added by Naveed
+    returnCode=0;
+
+    for (loop_var=0;loop_var<amount;loop_var++)
+    {
+        //read a byte from PM_ptr+seekPos+i
+        buffer[loop_var]=*((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ));
+        returnCode+=1;
+    }
+   //====================================================
 
 	if (returnCode >= 0)
 		VfdCache[file].seekPos += returnCode;
 	else
 	{
-		/*
-		 * Windows may run out of kernel buffers and return "Insufficient
-		 * system resources" error.  Wait a bit and retry to solve it.
-		 *
-		 * It is rumored that EINTR is also possible on some Unix filesystems,
-		 * in which case immediate retry is indicated.
-		 */
+        //
+         // Windows may run out of kernel buffers and return "Insufficient
+         // system resources" error.  Wait a bit and retry to solve it.
+         //
+         // It is rumored that EINTR is also possible on some Unix filesystems,
+         // in which case immediate retry is indicated.
+         //
 #ifdef WIN32
 		DWORD		error = GetLastError();
 
@@ -1382,21 +1506,22 @@ retry:
 				break;
 		}
 #endif
-		/* OK to retry if interrupted */
+        // OK to retry if interrupted
 		if (errno == EINTR)
 			goto retry;
 
-		/* Trouble, so assume we don't know the file position anymore */
+        // Trouble, so assume we don't know the file position anymore
 		VfdCache[file].seekPos = FileUnknownPos;
 	}
 
 	return returnCode;
 }
-
+*/
 int
 FileWrite(File file, char *buffer, int amount)
 {
 	int			returnCode;
+    int         loop_var;
 
 	Assert(FileIsValid(file));
 
@@ -1436,7 +1561,24 @@ FileWrite(File file, char *buffer, int amount)
 
 retry:
 	errno = 0;
-	returnCode = write(VfdCache[file].fd, buffer, amount);
+
+    //********************************************************
+    /*MOdified*/
+    //returnCode = write(VfdCache[file].fd, buffer, amount);//commented by Naveed
+
+    //Writing to memory mapped file
+    //Added by Naveed
+    returnCode=0;
+
+    for (loop_var=0;loop_var<amount;loop_var++)
+    {
+        //Write a byte from Buffer to memory location pointed by PM_ptr+seekPos+i
+        *((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ))=buffer[loop_var];
+        returnCode+=1;
+    }
+   //********************************************************
+
+
 
 	/* if write didn't set errno, assume problem is no disk space */
 	if (returnCode != amount && errno == 0)
@@ -1516,7 +1658,8 @@ FileSeek(File file, off_t offset, int whence)
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
 			   (int64) offset, whence));
-
+    //NOTE: Added by Naveed
+    //This if else is used in orignal postgres just to minimize the syscalls. We can collapse them into single situation to reduce code size
 	if (FileIsNotOpen(file))
 	{
 		switch (whence)
@@ -1534,8 +1677,10 @@ FileSeek(File file, off_t offset, int whence)
 				returnCode = FileAccess(file);
 				if (returnCode < 0)
 					return returnCode;
-				VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-											   offset, whence);
+                //commented by Naveed
+                //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//we need to modify this
+                //Added by Naveed
+                VfdCache[file].seekPos=VfdCache[file].fileLength+offset;
 				break;
 			default:
 				elog(ERROR, "invalid whence: %d", whence);
@@ -1551,17 +1696,23 @@ FileSeek(File file, off_t offset, int whence)
 					elog(ERROR, "invalid seek offset: " INT64_FORMAT,
 						 (int64) offset);
 				if (VfdCache[file].seekPos != offset)
-					VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-												   offset, whence);
+                    //commented by Naveed
+                    //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                    //Added by Naveed
+                    VfdCache[file].seekPos = offset;
 				break;
 			case SEEK_CUR:
 				if (offset != 0 || VfdCache[file].seekPos == FileUnknownPos)
-					VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-												   offset, whence);
+                    //commented by Naveed
+                    //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                    //Added by Naveed
+                    VfdCache[file].seekPos+= offset;
 				break;
 			case SEEK_END:
-				VfdCache[file].seekPos = lseek(VfdCache[file].fd,
-											   offset, whence);
+                //commented by Naveed
+                //VfdCache[file].seekPos = lseek(VfdCache[file].fd,offset, whence);//modify here, Naveed
+                //Added by Naveed
+                VfdCache[file].seekPos=VfdCache[file].fileLength+offset;
 				break;
 			default:
 				elog(ERROR, "invalid whence: %d", whence);
@@ -1599,7 +1750,17 @@ FileTruncate(File file, off_t offset)
 	if (returnCode < 0)
 		return returnCode;
 
-	returnCode = ftruncate(VfdCache[file].fd, offset);
+    //commented by Naveed
+    //returnCode = ftruncate(VfdCache[file].fd, offset);
+    returnCode=-1;//set returnCode to failure
+    //Do memory RE mapping of already memory mapped file, (mapped to VfdCache[file].PM_ptr), to a new offset (i.e truncate or extend)
+    //and make sure that new mapping is mapped to same old pointer (i.e. VfdCache[file].PM_ptr)
+    //Assert(mremap(VfdCache[file].PM_ptr,VfdCache[file].fileLength,offset,MREMAP_FIXED, VfdCache[file].PM_ptr)!=MAP_FAILED);
+    Assert(VfdCache[file].PM_ptr==mremap(VfdCache[file].PM_ptr,VfdCache[file].fileLength,offset,MREMAP_FIXED, VfdCache[file].PM_ptr));
+    //if sucessfull, set returnCode to 0
+    returnCode=0;
+    //Added by Naveed
+
 
 	if (returnCode == 0 && VfdCache[file].fileSize > offset)
 	{

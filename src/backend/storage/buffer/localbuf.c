@@ -377,7 +377,7 @@ DropRelFileNodeAllLocalBuffers(RelFileNode rnode)
  * InitLocalBuffers -
  *	  init the local buffer cache. Since most queries (esp. multi-user ones)
  *	  don't involve local buffers, we delay allocating actual memory for the
- *	  buffers until we need them; just make the buffer headers here.
+ *	  buffers until we need them; just make the buffer headers here (IMPORTANT).
  */
 static void
 InitLocalBuffers(void)

@@ -671,9 +671,10 @@ mdprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
 /*
  *	mdread() -- Read the specified block from a relation.
  */
-void
-mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-       char *buffer)
+//commented by naveed
+//void mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,char *buffer)
+//Added by Naveed
+void mdread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,char **buffer)
 {
 	off_t		seekpos;
 	int			nbytes;

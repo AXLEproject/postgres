@@ -49,8 +49,10 @@ typedef struct f_smgr
 						 BlockNumber blocknum, char *buffer, bool skipFsync);
 	void		(*smgr_prefetch) (SMgrRelation reln, ForkNumber forknum,
 											  BlockNumber blocknum);
-	void		(*smgr_read) (SMgrRelation reln, ForkNumber forknum,
-										  BlockNumber blocknum, char *buffer);
+    //commented by Naveed
+    //void		(*smgr_read) (SMgrRelation reln, ForkNumber forknum,BlockNumber blocknum, char *buffer);
+    //Added by Naveed
+    void		(*smgr_read) (SMgrRelation reln, ForkNumber forknum,BlockNumber blocknum, char **buffer);
 	void		(*smgr_write) (SMgrRelation reln, ForkNumber forknum,
 						 BlockNumber blocknum, char *buffer, bool skipFsync);
 	BlockNumber (*smgr_nblocks) (SMgrRelation reln, ForkNumber forknum);
@@ -619,9 +621,10 @@ smgrprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
  *		instantiate pages in the shared buffer cache.  All storage managers
  *		return pages in the format that POSTGRES expects.
  */
-void
-smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-		 char *buffer)
+//Added by Naveed
+void smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,char **buffer)
+//commented by Naveed
+//void smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,char *buffer)
 {
     (*(smgrsw[reln->smgr_which].smgr_read)) (reln, forknum, blocknum, buffer);
     //Naveed: How does it read a block from disk into buffer, I dont understand the details

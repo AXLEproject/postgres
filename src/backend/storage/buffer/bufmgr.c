@@ -611,6 +611,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
     //backends
 
 	*hit = false;
+    int loop_var;//added by Naveed
 
 	/* Make sure we will have room to remember the buffer pin */
     //Disk buffers are owned by resource owners. To pin/own a new buffer, we need to check if nbuffer owned by the current resource owner are less than
@@ -774,7 +775,16 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	if (isExtend)
 	{
 		/* new buffers are zero-filled */
-        MemSet((char *) bufBlock, 0, BLCKSZ);
+        //Avoid system call
+        MemSet((char *) bufBlock, 0, BLCKSZ);//commented by Naveed
+        //added by Naveed
+        /*
+        for (loop_var=0;loop_var<BLCKSZ;loop_var++)
+        {
+            *((char*)bufBlock[loop_var])=0;
+
+        }
+        */
         //IMPORTANT FOR PMemory: Here we need to modify the BLCKSZ....but here is used only to desctibe that how many zeros are to be filled in.
         //We need to look into description of "Block", the class of bufBlock to find out what is the size of actual block read and written to Disk
 
@@ -791,7 +801,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
             /*
              * in these two modes, page is initilaized with zero in the disk buffer
             */
-			MemSet((char *) bufBlock, 0, BLCKSZ);
+            MemSet((char *) bufBlock, 0, BLCKSZ);//Avoid System call
 		else
 		{
 			instr_time	io_start,
@@ -801,7 +811,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				INSTR_TIME_SET_CURRENT(io_start);
 
             //read a particular block (i.e. blockNum) from a relation(i.e. smgr) (Naveed: in the disk) into the supplied buffer.
-            smgrread(smgr, forkNum, blockNum, (char *) bufBlock);//smgread-->mdread-->FileRead-->read (Linus Syscall)
+            smgrread(smgr, forkNum, blockNum, (char *) bufBlock);//smgread-->mdread-->FileRead-->read (Linux Syscall)
 
             //A piece of code for tracking the time consumed during the read operation
 			if (track_io_timing)

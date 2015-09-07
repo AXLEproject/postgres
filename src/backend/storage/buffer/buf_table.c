@@ -26,6 +26,16 @@
 
 
 /* entry for buffer lookup hashtable */
+//Added by Naveed
+//we need to modify the hash table entry to something like below
+/*
+ * typedef struct
+ * {
+ * 	BufferTag	key;			// Tag of a disk page
+ *  void        *pmfs_mmap_ptr;				// Associated buffer ID
+ * } BufferLookupEnt;
+*/
+
 typedef struct
 {
 	BufferTag	key;			/* Tag of a disk page */
@@ -57,7 +67,7 @@ InitBufTable(int size)
 	/* assume no locking is needed yet */
 
 	/* BufferTag maps to Buffer */
-	info.keysize = sizeof(BufferTag);
+	info.keysize = sizeof(BufferTag);    
 	info.entrysize = sizeof(BufferLookupEnt);
 	info.num_partitions = NUM_BUFFER_PARTITIONS;
 
