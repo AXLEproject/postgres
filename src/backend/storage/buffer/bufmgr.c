@@ -611,7 +611,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
     //backends
 
 	*hit = false;
-    int loop_var;//added by Naveed
+    //int loop_var;//added by Naveed
 
 	/* Make sure we will have room to remember the buffer pin */
     //Disk buffers are owned by resource owners. To pin/own a new buffer, we need to check if nbuffer owned by the current resource owner are less than
@@ -770,7 +770,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
     //if condition is true it means that bufHdr is descriptor of a local Buffer(local to current session)
     //since desired block was found in a local block. If condition is false, it means that bufHdr is a descriptor
     //of shared Buffer (shared among sessions)
-    bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
+    bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);//important
 
 	if (isExtend)
 	{
@@ -811,7 +811,10 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				INSTR_TIME_SET_CURRENT(io_start);
 
             //read a particular block (i.e. blockNum) from a relation(i.e. smgr) (Naveed: in the disk) into the supplied buffer.
+            //commented by Naveed
             smgrread(smgr, forkNum, blockNum, (char *) bufBlock);//smgread-->mdread-->FileRead-->read (Linux Syscall)
+            //Added by Naveed
+            //smgrread(smgr, forkNum, blockNum, &((char *)(bufBlock)));//smgread-->mdread-->FileRead-->read (Linux Syscall)
 
             //A piece of code for tracking the time consumed during the read operation
 			if (track_io_timing)

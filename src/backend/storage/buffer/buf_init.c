@@ -69,14 +69,11 @@ InitBufferPool(void)
 
 	/* Align descriptors to a cacheline boundary. */
 	BufferDescriptors = (BufferDescPadded *) CACHELINEALIGN(
-										ShmemInitStruct("Buffer Descriptors",
-					NBuffers * sizeof(BufferDescPadded) + PG_CACHE_LINE_SIZE,
-														&foundDescs));
+                                        ShmemInitStruct("Buffer Descriptors",NBuffers * sizeof(BufferDescPadded) + PG_CACHE_LINE_SIZE,&foundDescs));
 
-	BufferBlocks = (char *)
-		ShmemInitStruct("Buffer Blocks",
-						NBuffers * (Size) BLCKSZ, &foundBufs);
-
+    BufferBlocks = (char *)ShmemInitStruct("Buffer Blocks",NBuffers * (Size) BLCKSZ, &foundBufs);
+    //Added by Naveed
+    //BufferBlocks = (char *)ShmemInitStruct("Buffer Blocks",NBuffers * (sizeof(void*)), &foundBufs);
 	if (foundDescs || foundBufs)
 	{
 		/* both should be present or neither */
@@ -99,6 +96,8 @@ InitBufferPool(void)
 			buf->usage_count = 0;
 			buf->refcount = 0;
 			buf->wait_backend_pid = 0;
+            //added by Naveed
+            //buf->pmfs_mmap_ptr = NULL;
 
 			SpinLockInit(&buf->buf_hdr_lock);
 

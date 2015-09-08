@@ -98,6 +98,8 @@ BufTableHashCode(BufferTag *tagPtr)
  *
  * Caller must hold at least share lock on BufMappingLock for tag's partition
  */
+//Added by naveed
+//void *
 int
 BufTableLookup(BufferTag *tagPtr, uint32 hashcode)
 {
@@ -113,6 +115,8 @@ BufTableLookup(BufferTag *tagPtr, uint32 hashcode)
 	if (!result)
 		return -1;
 
+    //Added by Naveed
+    //return result->pmfs_mmap_ptr;
 	return result->id;
 }
 
@@ -126,13 +130,16 @@ BufTableLookup(BufferTag *tagPtr, uint32 hashcode)
  *
  * Caller must hold exclusive lock on BufMappingLock for tag's partition
  */
-int
-BufTableInsert(BufferTag *tagPtr, uint32 hashcode, int buf_id)
+//Added by Naveed
+//void* BufTableInsert(BufferTag *tagPtr, uint32 hashcode, void* given_pmfs_mmap_ptr)
+int BufTableInsert(BufferTag *tagPtr, uint32 hashcode, int buf_id)
 {
 	BufferLookupEnt *result;
 	bool		found;
 
 	Assert(buf_id >= 0);		/* -1 is reserved for not-in-table */
+    //added by Naveed
+    //Assert(given_pmfs_mmap_ptr!=NULL)
 	Assert(tagPtr->blockNum != P_NEW);	/* invalid tag */
 
 	result = (BufferLookupEnt *)
@@ -144,8 +151,11 @@ BufTableInsert(BufferTag *tagPtr, uint32 hashcode, int buf_id)
 
 	if (found)					/* found something already in the table */
 		return result->id;
+        //added by naveed
+        //return result->pmfs_mmap_ptr;
 
 	result->id = buf_id;
+    //result->pmfs_mmap_ptr=given_pmfs_mmap_ptr;
 
 	return -1;
 }

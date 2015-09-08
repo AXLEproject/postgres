@@ -1374,6 +1374,7 @@ FilePrefetch(File file, off_t offset, int amount)
 	return 0;
 #endif
 }
+/*
 //Added by Naveed
 int FileRead(File file, char **buffer, int amount)
 {
@@ -1392,8 +1393,8 @@ int FileRead(File file, char **buffer, int amount)
         return returnCode;
 
 retry:
-    //********************************************************
-    /*MOdified*/
+    //=======================================================
+    //MOdified
     //returnCode = read(VfdCache[file].fd, buffer, amount);//commented by Naveed
 
     //reading from the memory mapped file
@@ -1401,26 +1402,26 @@ retry:
     returnCode=0;
     *buffer=(char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos);
     returnCode=amount;
-    /*
-    for (loop_var=0;loop_var<amount;loop_var++)
-    {
+    //
+    //for (loop_var=0;loop_var<amount;loop_var++)
+    //{
         //read a byte from PM_ptr+seekPos+i
-        buffer[loop_var]=*((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ));
-        returnCode+=1;
-    }*/
-   //********************************************************
+    //    buffer[loop_var]=*((char*)(VfdCache[file].PM_ptr + VfdCache[file].seekPos + loop_var ));
+    //    returnCode+=1;
+    //}
+   //============================================================
 
     if (returnCode >= 0)
         VfdCache[file].seekPos += returnCode;
     else
     {
-        /*
-         * Windows may run out of kernel buffers and return "Insufficient
-         * system resources" error.  Wait a bit and retry to solve it.
-         *
-         * It is rumored that EINTR is also possible on some Unix filesystems,
-         * in which case immediate retry is indicated.
-         */
+        //
+         // Windows may run out of kernel buffers and return "Insufficient
+         // system resources" error.  Wait a bit and retry to solve it.
+         //
+         // It is rumored that EINTR is also possible on some Unix filesystems,
+         // in which case immediate retry is indicated.
+         //
 #ifdef WIN32
         DWORD		error = GetLastError();
 
@@ -1435,19 +1436,19 @@ retry:
                 break;
         }
 #endif
-        /* OK to retry if interrupted */
+        // OK to retry if interrupted
         if (errno == EINTR)
             goto retry;
 
-        /* Trouble, so assume we don't know the file position anymore */
+        // Trouble, so assume we don't know the file position anymore
         VfdCache[file].seekPos = FileUnknownPos;
     }
 
     return returnCode;
 }
+*/
 
-/*
- * //commented by naveed
+//commented by naveed
 int FileRead(File file, char *buffer, int amount)
 {
 	int			returnCode;
@@ -1516,7 +1517,7 @@ retry:
 
 	return returnCode;
 }
-*/
+
 int
 FileWrite(File file, char *buffer, int amount)
 {
