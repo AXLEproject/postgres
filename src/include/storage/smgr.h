@@ -73,6 +73,9 @@ typedef struct SMgrRelationData
 	/* for md.c; NULL for forks that are not open */
 	struct _MdfdVec *md_fd[MAX_FORKNUM + 1];
 
+	/* for pm.c; NULL for forks that are not open */
+	struct _PmfdVec *pm_fd[MAX_FORKNUM + 1];
+
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	struct SMgrRelationData *next_unowned_reln;
 } SMgrRelationData;

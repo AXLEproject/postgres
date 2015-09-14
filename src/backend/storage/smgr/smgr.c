@@ -171,8 +171,13 @@ smgropen(RelFileNode rnode, BackendId backend)
 		reln->smgr_which = DEFAULT_STORAGE; /* we now have md.c and pm.c */
 
 		/* mark it not open */
-		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++)
+		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++) {
+                    if (DEFAULT_STORAGE == 0) {
 			reln->md_fd[forknum] = NULL;
+                    } else {
+                        reln->pm_fd[forknum] = NULL;
+                    }
+                }
 
 		/* it has no owner yet */
 		add_to_unowned_list(reln);
@@ -377,8 +382,13 @@ smgrcreate(SMgrRelation reln, ForkNumber forknum, bool isRedo)
 	 * Exit quickly in WAL replay mode if we've already opened the file. If
 	 * it's open, it surely must exist.
 	 */
-	if (isRedo && reln->md_fd[forknum] != NULL)
+        if (DEFAULT_STORAGE == 0) {
+            if (isRedo && reln->md_fd[forknum] != NULL)
 		return;
+        } else {
+            if (isRedo && reln->pm_fd[forknum] != NULL)
+		return;
+        }
 
 	/*
 	 * We may be using the target table space for the first time in this
