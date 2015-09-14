@@ -68,6 +68,11 @@ static const f_smgr smgrsw[] = {
 	{mdinit, NULL, mdclose, mdcreate, mdexists, mdunlink, mdextend,
 		mdprefetch, mdread, mdwrite, mdnblocks, mdtruncate, mdimmedsync,
 		mdpreckpt, mdsync, mdpostckpt
+	},
+	/* persistent memory */
+	{pminit, pmshutdown, pmclose, pmcreate, pmexists, pmunlink, pmextend,
+		pmprefetch, pmread, pmwrite, pmnblocks, pmtruncate, pmimmedsync,
+		pmpreckpt, pmsync, pmpostckpt
 	}
 };
 
