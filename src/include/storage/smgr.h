@@ -18,6 +18,12 @@
 #include "storage/block.h"
 #include "storage/relfilenode.h"
 
+/*
+ * This sets the default storage to be the persistent memory storage
+ * manager. Assumes a system running on persistent memory and the 
+ * PMFS file system. Only one storage backend can be used at a time.
+ */
+#define DEFAULT_STORAGE 1
 
 /*
  * smgr.c maintains a table of SMgrRelation objects, which are essentially
