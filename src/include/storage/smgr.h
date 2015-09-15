@@ -23,7 +23,7 @@
  * manager. Assumes a system running on persistent memory and the 
  * PMFS file system. Only one storage backend can be used at a time.
  */
-#define DEFAULT_STORAGE 1
+#define DEFAULT_STORAGE_PM 1
 
 /*
  * smgr.c maintains a table of SMgrRelation objects, which are essentially
@@ -70,12 +70,13 @@ typedef struct SMgrRelationData
 	 */
 	int			smgr_which;		/* storage manager selector */
 
+#ifndef DEFAULT_STORAGE_PM
 	/* for md.c; NULL for forks that are not open */
 	struct _MdfdVec *md_fd[MAX_FORKNUM + 1];
-
+#else
 	/* for pm.c; NULL for forks that are not open */
 	struct _PmfdVec *pm_fd[MAX_FORKNUM + 1];
-
+#endif
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	struct SMgrRelationData *next_unowned_reln;
 } SMgrRelationData;
@@ -117,6 +118,8 @@ extern void AtEOXact_SMgr(void);
 
 /* internals: move me elsewhere -- ay 7/94 */
 
+#ifndef DEFAULT_STORAGE_PM
+
 /* in md.c */
 extern void mdinit(void);
 extern void mdclose(SMgrRelation reln, ForkNumber forknum);
@@ -144,6 +147,39 @@ extern void RememberFsyncRequest(RelFileNode rnode, ForkNumber forknum,
 					 BlockNumber segno);
 extern void ForgetRelationFsyncRequests(RelFileNode rnode, ForkNumber forknum);
 extern void ForgetDatabaseFsyncRequests(Oid dbid);
+
+#else
+
+/* in pm.c */
+extern void pminit(void);
+extern void pmshutdown(void);
+extern void pmclose(SMgrRelation reln, ForkNumber forknum);
+extern void pmcreate(SMgrRelation reln, ForkNumber forknum, bool isRedo);
+extern bool pmexists(SMgrRelation reln, ForkNumber forknum);
+extern void pmunlink(RelFileNodeBackend rnode, ForkNumber forknum, bool isRedo);
+extern void pmextend(SMgrRelation reln, ForkNumber forknum,
+		 BlockNumber blocknum, char *buffer, bool skipFsync);
+extern void pmprefetch(SMgrRelation reln, ForkNumber forknum,
+		   BlockNumber blocknum);
+extern void pmread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
+	   char *buffer);
+extern void pmwrite(SMgrRelation reln, ForkNumber forknum,
+		BlockNumber blocknum, char *buffer, bool skipFsync);
+extern BlockNumber pmnblocks(SMgrRelation reln, ForkNumber forknum);
+extern void pmtruncate(SMgrRelation reln, ForkNumber forknum,
+		   BlockNumber nblocks);
+extern void pmimmedsync(SMgrRelation reln, ForkNumber forknum);
+extern void pmpreckpt(void);
+extern void pmsync(void);
+extern void pmpostckpt(void);
+
+extern void SetForwardFsyncRequests(void);
+extern void RememberFsyncRequest(RelFileNode rnode, ForkNumber forknum,
+					 BlockNumber segno);
+extern void ForgetRelationFsyncRequests(RelFileNode rnode, ForkNumber forknum);
+extern void ForgetDatabaseFsyncRequests(Oid dbid);
+
+#endif
 
 /* smgrtype.c */
 extern Datum smgrout(PG_FUNCTION_ARGS);

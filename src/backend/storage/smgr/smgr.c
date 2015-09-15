@@ -64,16 +64,19 @@ typedef struct f_smgr
 
 
 static const f_smgr smgrsw[] = {
+#ifndef DEFAULT_STORAGE_PM
 	/* magnetic disk */
 	{mdinit, NULL, mdclose, mdcreate, mdexists, mdunlink, mdextend,
 		mdprefetch, mdread, mdwrite, mdnblocks, mdtruncate, mdimmedsync,
 		mdpreckpt, mdsync, mdpostckpt
-	},
+	}
+#else
 	/* persistent memory */
 	{pminit, pmshutdown, pmclose, pmcreate, pmexists, pmunlink, pmextend,
 		pmprefetch, pmread, pmwrite, pmnblocks, pmtruncate, pmimmedsync,
 		pmpreckpt, pmsync, pmpostckpt
 	}
+#endif
 };
 
 static const int NSmgr = lengthof(smgrsw);
@@ -173,15 +176,15 @@ smgropen(RelFileNode rnode, BackendId backend)
 		reln->smgr_targblock = InvalidBlockNumber;
 		reln->smgr_fsm_nblocks = InvalidBlockNumber;
 		reln->smgr_vm_nblocks = InvalidBlockNumber;
-		reln->smgr_which = DEFAULT_STORAGE; /* we now have md.c and pm.c */
+		reln->smgr_which = 0; /* we now have md.c and pm.c */
 
 		/* mark it not open */
 		for (forknum = 0; forknum <= MAX_FORKNUM; forknum++) {
-                    if (DEFAULT_STORAGE == 0) {
+#ifndef DEFAULT_STORAGE_PM
 			reln->md_fd[forknum] = NULL;
-                    } else {
+#else
                         reln->pm_fd[forknum] = NULL;
-                    }
+#endif
                 }
 
 		/* it has no owner yet */
@@ -387,13 +390,13 @@ smgrcreate(SMgrRelation reln, ForkNumber forknum, bool isRedo)
 	 * Exit quickly in WAL replay mode if we've already opened the file. If
 	 * it's open, it surely must exist.
 	 */
-        if (DEFAULT_STORAGE == 0) {
-            if (isRedo && reln->md_fd[forknum] != NULL)
-		return;
-        } else {
-            if (isRedo && reln->pm_fd[forknum] != NULL)
-		return;
-        }
+#ifndef DEFAULT_STORAGE_PM
+        if (isRedo && reln->md_fd[forknum] != NULL)
+	    return;
+#else
+        if (isRedo && reln->pm_fd[forknum] != NULL)
+            return;
+#endif
 
 	/*
 	 * We may be using the target table space for the first time in this
