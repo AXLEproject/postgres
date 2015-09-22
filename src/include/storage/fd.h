@@ -108,6 +108,7 @@ extern void AtEOSubXact_Files(bool isCommit, SubTransactionId mySubid,
 				  SubTransactionId parentSubid);
 extern void RemovePgTempFiles(void);
 
+extern int	pg_msync(File file);
 extern int	pg_fsync(int fd);
 extern int	pg_fsync_no_writethrough(int fd);
 extern int	pg_fsync_writethrough(int fd);

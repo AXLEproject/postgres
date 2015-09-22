@@ -192,16 +192,16 @@ static BlockNumber _pmnblocks(SMgrRelation reln, ForkNumber forknum,
 
 
 /*
- *	pminit() -- Initialize private state for magnetic disk storage manager.
+ *	pminit() -- Initialize private state for persistent memory storage manager.
  */
 void
 pminit(void)
 {
 	PmCxt = AllocSetContextCreate(TopMemoryContext,
-								  "PmSmgr",
-								  ALLOCSET_DEFAULT_MINSIZE,
-								  ALLOCSET_DEFAULT_INITSIZE,
-								  ALLOCSET_DEFAULT_MAXSIZE);
+                                      "PmSmgr",
+                                      ALLOCSET_DEFAULT_MINSIZE,
+                                      ALLOCSET_DEFAULT_INITSIZE,
+                                      ALLOCSET_DEFAULT_MAXSIZE);
 
 	/*
 	 * Create pending-operations hashtable if we need it.  Currently, we need
@@ -222,10 +222,10 @@ pminit(void)
 		 * practice.
 		 */
 		pendingOpsCxt = AllocSetContextCreate(PmCxt,
-											  "Pending Ops Context",
-											  ALLOCSET_DEFAULT_MINSIZE,
-											  ALLOCSET_DEFAULT_INITSIZE,
-											  ALLOCSET_DEFAULT_MAXSIZE);
+					            "Pending Ops Context",
+						    ALLOCSET_DEFAULT_MINSIZE,
+						    ALLOCSET_DEFAULT_INITSIZE,
+						    ALLOCSET_DEFAULT_MAXSIZE);
 		MemoryContextAllowInCriticalSection(pendingOpsCxt, true);
 
 		MemSet(&hash_ctl, 0, sizeof(hash_ctl));
@@ -233,9 +233,9 @@ pminit(void)
 		hash_ctl.entrysize = sizeof(PendingOperationEntry);
 		hash_ctl.hcxt = pendingOpsCxt;
 		pendingOpsTable = hash_create("Pending Ops Table",
-									  100L,
-									  &hash_ctl,
-									  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
+        					100L,
+						&hash_ctl,
+					        HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
 		pendingUnlinks = NIL;
 	}
 }
@@ -1730,7 +1730,7 @@ static PmfdVec *
 _pmfd_getseg(SMgrRelation reln, ForkNumber forknum, BlockNumber blkno,
 			 bool skipFsync, ExtensionBehavior behavior)
 {
-	PmfdVec    *v = pmopen(reln, forknum, behavior);
+	PmfdVec    *v = pmopen(reln, forknum, behavior); /* AAS: The file should be open already when called from pmsync, check */
 	BlockNumber targetseg;
 	BlockNumber nextsegno;
 
