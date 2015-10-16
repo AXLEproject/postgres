@@ -57,10 +57,13 @@ extern int	target_prefetch_pages;
 
 /* in buf_init.c */
 extern PGDLLIMPORT char *BufferBlocks;
+extern PGDLLIMPORT char **BufferBlocksPtr;
+extern PGDLLIMPORT char **BufferBlocksPtr_save;
 
 /* in localbuf.c */
 extern PGDLLIMPORT int NLocBuffer;
 extern PGDLLIMPORT Block *LocalBufferBlockPointers;
+extern PGDLLIMPORT Block *LocalBufferBlockPointers_save;
 extern PGDLLIMPORT int32 *LocalRefCount;
 
 /* special block number for ReadBuffer() */
@@ -115,7 +118,7 @@ extern PGDLLIMPORT int32 *LocalRefCount;
 	BufferIsLocal(buffer) ? \
 		LocalBufferBlockPointers[-(buffer) - 1] \
 	: \
-		(Block) (BufferBlocks + ((Size) ((buffer) - 1)) * BLCKSZ) \
+		(Block) (BufferBlocksPtr[buffer - 1]) \
 )
 
 /*

@@ -695,6 +695,8 @@ lazy_scan_heap(Relation onerel, LVRelStats *vacrelstats,
 			LockRelationForExtension(onerel, ExclusiveLock);
 			UnlockRelationForExtension(onerel, ExclusiveLock);
 			LockBufferForCleanup(buf);
+			MarkBufferDirty(buf);
+		        page = BufferGetPage(buf);
 			if (PageIsNew(page))
 			{
 				ereport(WARNING,
@@ -704,7 +706,6 @@ lazy_scan_heap(Relation onerel, LVRelStats *vacrelstats,
 				empty_pages++;
 			}
 			freespace = PageGetHeapFreeSpace(page);
-			MarkBufferDirty(buf);
 			UnlockReleaseBuffer(buf);
 
 			RecordPageWithFreeSpace(onerel, blkno, freespace);
@@ -723,6 +724,7 @@ lazy_scan_heap(Relation onerel, LVRelStats *vacrelstats,
 
 				/* mark buffer dirty before writing a WAL record */
 				MarkBufferDirty(buf);
+		                page = BufferGetPage(buf);
 
 				/*
 				 * It's possible that another backend has extended the heap,

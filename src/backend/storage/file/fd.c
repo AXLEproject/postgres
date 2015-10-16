@@ -153,7 +153,7 @@ int			max_safe_fds = 32;	/* default if not changed */
 #define FileIsValid(file) \
 	((file) > 0 && (file) < (int) SizeVfdCache && VfdCache[file].fileName != NULL)
 
-#define FileIsMapped(file) (VfdCache[file].pm_ptr != NULL)
+#define FileIsMapped(file) (VfdCache[file].pm_list_idx > -1)
 
 #define FileIsNotOpen(file) (VfdCache[file].fd == VFD_CLOSED)
 
@@ -166,8 +166,9 @@ int			max_safe_fds = 32;	/* default if not changed */
 typedef struct vfd
 {
 	int			fd;				/* current FD, or VFD_CLOSED if none */
-        void*                   pm_ptr; /* Pointer to the mapped region for persistent memory */
-        off_t                   pm_size; /* Size of the file in bytes */
+        void*                   pm_ptr_list[128*1024]; /* AAS: Pointers to the mapped region for persistent memory, dirty */
+        off_t                   pm_size_list[128*1024]; /* AAS: Sizes of the mapping, cumulative */
+        int                     pm_list_idx;
 	unsigned short fdstate;		/* bitflags for VFD's state */
 	ResourceOwner resowner;		/* owner, for automatic cleanup */
 	File		nextFree;		/* link to next free VFD, if in freelist */
@@ -316,19 +317,24 @@ static void fsync_fname_ext(const char *fname, bool isdir, int elevel);
 
 
 /*
- * pg_msync --- do msync for persistent memory backend
+ * AAS: pg_msync --- do msync for persistent memory backend
  */
 int
 pg_msync(File file)
 {
+    int i, returnCode;
 	DO_DB(elog(LOG, "pg_msync: %d (%s)",
 			   file, VfdCache[file].fileName));
     /* AAS: Call msync with appropiate parameters */
     Assert(FileIsMapped(file));
     if (enableFsync) {
-	DO_DB(elog(LOG, "pg_msync: %d (%s), ptr: %p, size %lu",
-			   file, VfdCache[file].fileName, VfdCache[file].pm_ptr, VfdCache[file].pm_size));
-        return msync(VfdCache[file].pm_ptr, VfdCache[file].pm_size, MS_SYNC);
+        for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {
+	    DO_DB(elog(LOG, "pg_msync: %d (%s), ptr: %p, size %lu",
+			   file, VfdCache[file].fileName, VfdCache[file].pm_ptr_list[i], VfdCache[file].pm_size_list[i]));
+            returnCode =  msync(VfdCache[file].pm_ptr_list[i], VfdCache[file].pm_size_list[i], MS_SYNC);
+            if (returnCode != 0) return returnCode;
+        }
+        return 0;
     } else {
         return 0;
     }
@@ -507,6 +513,7 @@ InitFileAccess(void)
 
 	MemSet((char *) &(VfdCache[0]), 0, sizeof(Vfd));
 	VfdCache->fd = VFD_CLOSED;
+	VfdCache->pm_list_idx = -1;
 
 	SizeVfdCache = 1;
 
@@ -911,6 +918,7 @@ AllocateVfd(void)
 			MemSet((char *) &(VfdCache[i]), 0, sizeof(Vfd));
 			VfdCache[i].nextFree = i + 1;
 			VfdCache[i].fd = VFD_CLOSED;
+                        VfdCache[i].pm_list_idx = -1;
 		}
 		VfdCache[newCacheSize - 1].nextFree = 0;
 		VfdCache[0].nextFree = SizeVfdCache;
@@ -931,6 +939,7 @@ AllocateVfd(void)
 static void
 FreeVfd(File file)
 {
+        int i;
 	Vfd		   *vfdP = &VfdCache[file];
 
 	DO_DB(elog(LOG, "FreeVfd: %d (%s)",
@@ -942,8 +951,11 @@ FreeVfd(File file)
 		vfdP->fileName = NULL;
 	}
 	vfdP->fdstate = 0x0;
-	vfdP->pm_ptr = NULL;
-	vfdP->pm_size = 0;
+        for (i = 0; i <= vfdP->pm_list_idx; i++) {
+            vfdP->pm_ptr_list[i] = NULL;
+	    vfdP->pm_size_list[i] = 0;
+        }
+        vfdP->pm_list_idx = -1;
 
 	vfdP->nextFree = VfdCache[0].nextFree;
 	VfdCache[0].nextFree = file;
@@ -1046,6 +1058,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
         /* 
          * AAS: memory map file 
          */
+        Assert(vfdP->pm_list_idx == -1);
         if (fstat(vfdP->fd, &sbuf) != 0) {
 		int			save_errno = errno;
 
@@ -1054,11 +1067,11 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 		errno = save_errno;
 		return -1;
         } 
-        vfdP->pm_size = sbuf.st_size;
+        vfdP->pm_size_list[0] = sbuf.st_size;
 
-        if (vfdP->pm_size != 0) {
-            vfdP->pm_ptr = mmap(NULL, vfdP->pm_size, PROT_READ | PROT_WRITE, MAP_SHARED, vfdP->fd, 0);
-            if (vfdP->pm_ptr == MAP_FAILED) {
+        if (vfdP->pm_size_list[0] != 0) {
+            vfdP->pm_ptr_list[0] = mmap(NULL, vfdP->pm_size_list[0], PROT_READ | PROT_WRITE, MAP_SHARED, vfdP->fd, 0);
+            if (vfdP->pm_ptr_list[0] == MAP_FAILED) {
                     DO_DB(elog(LOG, "PathNameOpenFile ERROR mapping file: %s %x %o",
                                fileName, fileFlags, fileMode));
                     int			save_errno = errno;
@@ -1068,9 +1081,10 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
                     errno = save_errno;
                     return -1;
             }
+            vfdP->pm_list_idx++;
         } else {
             /* Cannot mmap at this point, file must have size > 0 */
-            vfdP->pm_ptr = NULL;
+            vfdP->pm_ptr_list[0] = NULL;
         }
 
 	++nfile;
@@ -1231,6 +1245,8 @@ void
 FileClose(File file)
 {
 	Vfd		   *vfdP;
+        int i;
+        off_t prev_map_size;
 
 	Assert(FileIsValid(file));
 
@@ -1239,13 +1255,21 @@ FileClose(File file)
 
 	vfdP = &VfdCache[file];
 
-        /* AAS: Unmap the file */
+        /* AAS: We cannot unmap all current mappings because postgres does not release the current
+         * shared buffers for this file. This causes all sorts of problems and is the main reason to leave
+         * the mappings open. Ideally the buffer manager should clean up before calling FileClose */
         if (FileIsMapped(file)) {
-            if (munmap(vfdP->pm_ptr, vfdP->pm_size) != 0) {
-                elog(ERROR, "could not unmap file \"%s\": %m", vfdP->fileName);
+            /*prev_map_size = 0;*/
+            for (i = 0; i <= vfdP->pm_list_idx; i++) {
+
+                /*if (munmap(vfdP->pm_ptr_list[i], vfdP->pm_size_list[i] - prev_map_size) != 0) {*/
+                    /*elog(ERROR, "could not unmap file \"%s\": %m", vfdP->fileName);*/
+                /*}*/
+                /*prev_map_size = vfdP->pm_size_list[i];*/
+                vfdP->pm_ptr_list[i] = NULL;
+                vfdP->pm_size_list[i] = 0;
             }
-            vfdP->pm_ptr = NULL;
-            vfdP->pm_size = 0;
+            vfdP->pm_list_idx = -1;
         }
 
 	if (!FileIsNotOpen(file))
@@ -1360,17 +1384,19 @@ FilePrefetch(File file, off_t offset, int amount)
 }
 
 int
-FileRead(File file, char *buffer, int amount)
+FileRead(File file, char **buffer, int amount)
 {
 	int			returnCode;
+        int i;
+        off_t delta;
 
 	Assert(FileIsValid(file));
 	Assert(FileIsMapped(file));
 
-	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p %p",
+	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
-			   amount, buffer, VfdCache[file].pm_ptr));
+			   amount, buffer));
 
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
@@ -1379,19 +1405,29 @@ FileRead(File file, char *buffer, int amount)
 retry:
 	/*returnCode = read(VfdCache[file].fd, buffer, amount);*/
 
-        /* Check if amount is higher than the actual amount of bytes left
+        /* 
+         * AAS: Check if amount is higher than the actual amount of bytes left
          * in file to read. This can happen in temporary files.
          */
-        if (VfdCache[file].seekPos + amount > VfdCache[file].pm_size) {
-            amount = VfdCache[file].pm_size - VfdCache[file].seekPos;
+        if (VfdCache[file].seekPos + amount > VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]) {
+            amount = VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx] - VfdCache[file].seekPos;
         }
 
-        if (memcpy(buffer, (char*)VfdCache[file].pm_ptr + VfdCache[file].seekPos, amount) != buffer) {
-            returnCode = -1;
-        } else {
-            returnCode = amount;
+        /* 
+         * AAS: Redirect pointer to PM file.
+         */
+        for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {
+            if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {
+                break;
+            }
         }
+        Assert(i <= VfdCache[file].pm_list_idx);
+        if (i == 0) delta = VfdCache[file].seekPos;
+        else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
+        Assert(delta >= 0);
+        *buffer = (char*) VfdCache[file].pm_ptr_list[i] + delta;
 
+        returnCode = amount;
 	if (returnCode >= 0)
 		VfdCache[file].seekPos += returnCode;
 	else
@@ -1432,6 +1468,10 @@ int
 FileWrite(File file, char *buffer, int amount)
 {
 	int			returnCode;
+        int i;
+        off_t delta;
+        off_t offset;
+        char* map_ptr;
 
 	Assert(FileIsValid(file));
 
@@ -1471,36 +1511,42 @@ FileWrite(File file, char *buffer, int amount)
 
 retry:
         /* AAS: Changing to mmap I/O */
-	errno = 0;
-        if (VfdCache[file].pm_size == VfdCache[file].seekPos) {
-            /* Need to munmap + ftruncate + mmap */
-            if (FileTruncate(file, VfdCache[file].pm_size + amount) < 0) {
+        if (FileIsMapped(file)) 
+            Assert(VfdCache[file].seekPos <= VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]);
+
+        if (FileIsMapped(file) && VfdCache[file].seekPos < VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx])
+            Assert(VfdCache[file].seekPos+amount <= VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]);
+
+        if ( !FileIsMapped(file) || VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx] == VfdCache[file].seekPos) {
+            if (!FileIsMapped(file)) {
+                Assert(VfdCache[file].seekPos == 0);
+                offset = amount;
+            }else {
+                offset = VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx] + amount;
+            }
+            if (FileTruncate(file, offset) < 0) {
                     ereport(ERROR,
                                     (errcode_for_file_access(),
                                      errmsg("could not truncate file \"%s\": %m",
                                                     VfdCache[file].fileName)));
             }
-            /*returnCode = munmap(VfdCache[file].pm_ptr, VfdCache[file].pm_size);*/
-	    /*if (returnCode != 0) {*/
-                /*return returnCode;*/
-            /*}*/
-
-	    /*returnCode = ftruncate(VfdCache[file].fd, VfdCache[file].pm_size + amount);*/
-	    /*if (returnCode < 0) {*/
-		/*return returnCode;*/
-            /*}*/
-
-            /*VfdCache[file].pm_ptr = mmap(NULL, VfdCache[file].pm_size + amount, PROT_READ | PROT_WRITE, MAP_SHARED, VfdCache[file].fd, 0);*/
-            /*if (VfdCache[file].pm_ptr == MAP_FAILED) {*/
-                /*return errno;*/
-            /*}*/
-                /*VfdCache[file].pm_size += returnCode;*/
-            
         }
 
-        Assert(VfdCache[file].seekPos + amount <= VfdCache[file].pm_size);
+        Assert(VfdCache[file].seekPos + amount <= VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]);
 
-        if (memcpy((char*)VfdCache[file].pm_ptr + VfdCache[file].seekPos, buffer, amount) != (char*)VfdCache[file].pm_ptr + VfdCache[file].seekPos) {
+        /* AAS: Find the actual map ptr */
+        for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {
+            if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {
+                break;
+            }
+        }
+        Assert(i <= VfdCache[file].pm_list_idx);
+        if (i == 0) delta = VfdCache[file].seekPos;
+        else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
+        Assert(delta >= 0);
+        map_ptr = (char*) VfdCache[file].pm_ptr_list[i] + delta;
+
+        if (memcpy(map_ptr, buffer, amount) != map_ptr) {
             returnCode = -1;
         } else {
             returnCode = amount;
@@ -1608,7 +1654,7 @@ FileSeek(File file, off_t offset, int whence)
 				/*if (returnCode < 0)*/
 					/*return returnCode;*/
 				/*VfdCache[file].seekPos = lseek(VfdCache[file].fd, offset, whence);*/
-                                VfdCache[file].seekPos = VfdCache[file].pm_size + offset;
+                                VfdCache[file].seekPos = VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx] + offset;
 				break;
 			default:
 				elog(ERROR, "invalid whence: %d", whence);
@@ -1662,6 +1708,12 @@ int
 FileTruncate(File file, off_t offset)
 {
 	int			returnCode;
+        bool shrink;
+        int current_mapping;
+        int i;
+        int old_map_size, new_map_size;
+        off_t start_new_map;
+        struct stat sbuf;
 
 	Assert(FileIsValid(file));
 
@@ -1672,10 +1724,49 @@ FileTruncate(File file, off_t offset)
 	if (returnCode < 0)
 		return returnCode;
         
-        if (FileIsMapped(file)) {
-            returnCode = munmap(VfdCache[file].pm_ptr, VfdCache[file].pm_size);
-            if (returnCode != 0) {
-                return returnCode;
+        /* 
+         * AAS: We can never unmap a region of a file until we call FileClose since we cannot
+         * guarantee that after truncating the mapping will be done in the same place. For this
+         * reason we need to maintain a list of mappings per file.
+         */
+
+        /*
+         * AAS: First check if we are shrinking the file and unmap as many mappings as necessary.
+         * Finally remap if necessary
+         */
+        if (fstat(VfdCache[file].fd, &sbuf) != 0) {
+            Assert(false);
+        } 
+        if (sbuf.st_size > 0) Assert(FileIsMapped(file));
+        else Assert(!FileIsMapped(file));
+
+        shrink = (FileIsMapped(file) && (offset < VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]));
+        if (shrink) {
+            for (i = VfdCache[file].pm_list_idx; i >= 0; i--) {
+                if (offset == 0 || (i > 0 && offset <= VfdCache[file].pm_size_list[i-1])) {
+                    returnCode = munmap(VfdCache[file].pm_ptr_list[i], VfdCache[file].pm_size_list[i]);
+                    if (returnCode != 0) return returnCode;
+
+                    VfdCache[file].pm_ptr_list[i] = 0;
+                    VfdCache[file].pm_size_list[i] = 0;
+                    VfdCache[file].pm_list_idx--;
+                } else {
+                    //Check if remap
+                    Assert(offset <= VfdCache[file].pm_size_list[i]);
+                    if (i == 0 || (offset > VfdCache[file].pm_size_list[i-1] && offset != VfdCache[file].pm_size_list[i])) {
+                        if (i == 0) {
+                            old_map_size = VfdCache[file].pm_size_list[i];
+                            new_map_size = offset;
+                        } else {
+                            old_map_size = VfdCache[file].pm_size_list[i] - VfdCache[file].pm_size_list[i-1];
+                            new_map_size = offset - VfdCache[file].pm_size_list[i-1];
+                        } 
+                        if (mremap(VfdCache[file].pm_ptr_list[i], old_map_size, new_map_size, MREMAP_FIXED, VfdCache[file].pm_ptr_list[i]) == MAP_FAILED)
+                            return -1;
+                        VfdCache[file].pm_size_list[i] = new_map_size;
+                    }
+                    break;
+                }
             }
         }
 
@@ -1692,15 +1783,24 @@ FileTruncate(File file, off_t offset)
 		VfdCache[file].fileSize = offset;
 	}
 
-        if (offset > 0) {
-            VfdCache[file].pm_ptr = mmap(NULL, offset, PROT_READ | PROT_WRITE, MAP_SHARED, VfdCache[file].fd, 0);
-            if (VfdCache[file].pm_ptr == MAP_FAILED) {
+        /*
+         * AAS: If we are extending a new mapping needs to be created
+         */
+        if (!shrink) {
+            if(!FileIsMapped(file)) {
+                new_map_size = offset;
+                start_new_map = 0;
+            } else {
+                new_map_size = offset - VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx];
+                start_new_map = VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx];
+            }
+            
+            VfdCache[file].pm_ptr_list[VfdCache[file].pm_list_idx + 1] = mmap(NULL, new_map_size, PROT_READ | PROT_WRITE, MAP_SHARED, VfdCache[file].fd, start_new_map);
+            if (VfdCache[file].pm_ptr_list[VfdCache[file].pm_list_idx + 1] == MAP_FAILED) {
                 return -1;
             }
-            VfdCache[file].pm_size = offset;
-        } else {
-            VfdCache[file].pm_ptr = NULL;
-            VfdCache[file].pm_size = 0;
+            VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx + 1] = offset;
+            VfdCache[file].pm_list_idx++;
         }
 
 	return returnCode;

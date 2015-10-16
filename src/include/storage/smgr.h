@@ -103,7 +103,7 @@ extern void smgrextend(SMgrRelation reln, ForkNumber forknum,
 extern void smgrprefetch(SMgrRelation reln, ForkNumber forknum,
 			 BlockNumber blocknum);
 extern void smgrread(SMgrRelation reln, ForkNumber forknum,
-		 BlockNumber blocknum, char *buffer);
+		 BlockNumber blocknum, char **buffer);
 extern void smgrwrite(SMgrRelation reln, ForkNumber forknum,
 		  BlockNumber blocknum, char *buffer, bool skipFsync);
 extern BlockNumber smgrnblocks(SMgrRelation reln, ForkNumber forknum);
@@ -162,7 +162,7 @@ extern void pmextend(SMgrRelation reln, ForkNumber forknum,
 extern void pmprefetch(SMgrRelation reln, ForkNumber forknum,
 		   BlockNumber blocknum);
 extern void pmread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-	   char *buffer);
+	   char **buffer);
 extern void pmwrite(SMgrRelation reln, ForkNumber forknum,
 		BlockNumber blocknum, char *buffer, bool skipFsync);
 extern BlockNumber pmnblocks(SMgrRelation reln, ForkNumber forknum);

@@ -677,8 +677,7 @@ pmprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
  *	pmread() -- Read the specified block from a relation.
  */
 void
-pmread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-	   char *buffer)
+pmread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum, char **buffer)
 {
 	off_t		seekpos;
 	int			nbytes;

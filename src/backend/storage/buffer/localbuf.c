@@ -36,11 +36,14 @@ typedef struct
 /* Note: this macro only works on local buffers, not shared ones! */
 #define LocalBufHdrGetBlock(bufHdr) \
 	LocalBufferBlockPointers[-((bufHdr)->buf_id + 2)]
+#define LocalBufHdrGetBlock_save(bufHdr) \
+        LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)]
 
 int			NLocBuffer = 0;		/* until buffers are initialized */
 
 BufferDesc *LocalBufferDescriptors = NULL;
 Block	   *LocalBufferBlockPointers = NULL;
+Block	   *LocalBufferBlockPointers_save = NULL;
 int32	   *LocalRefCount = NULL;
 
 static int	nextFreeLocalBuf = 0;
@@ -223,6 +226,7 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 	{
 		/* Set pointer for use by BufferGetBlock() macro */
 		LocalBufHdrGetBlock(bufHdr) = GetLocalBufferStorage();
+                LocalBufHdrGetBlock_save(bufHdr) = LocalBufHdrGetBlock(bufHdr); // AAS: copy the pointer of newly allocated local buffer
 	}
 
 	/*
@@ -284,6 +288,18 @@ MarkLocalBufferDirty(Buffer buffer)
 		pgBufferUsage.local_blks_dirtied++;
 
 	bufHdr->flags |= BM_DIRTY;
+
+        /* 
+         * AAS: If the buffer is pointing to the actual PM data, we need to copy the buffer over
+         * to a DRAM buffer, or we would be writting directly in PM data.
+         */
+        if (LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)] != LocalBufferBlockPointers[-((bufHdr)->buf_id + 2)]) {
+            if (memcpy(LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)], LocalBufferBlockPointers[-((bufHdr)->buf_id + 2)], BLCKSZ) != LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)]) {
+                Assert(false);
+            }
+            LocalBufferBlockPointers[-((bufHdr)->buf_id + 2)] = LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)];
+        }
+
 }
 
 /*
@@ -389,8 +405,9 @@ InitLocalBuffers(void)
 	/* Allocate and zero buffer headers and auxiliary arrays */
 	LocalBufferDescriptors = (BufferDesc *) calloc(nbufs, sizeof(BufferDesc));
 	LocalBufferBlockPointers = (Block *) calloc(nbufs, sizeof(Block));
+        LocalBufferBlockPointers_save = (Block *) calloc(nbufs, sizeof(Block));
 	LocalRefCount = (int32 *) calloc(nbufs, sizeof(int32));
-	if (!LocalBufferDescriptors || !LocalBufferBlockPointers || !LocalRefCount)
+	if (!LocalBufferDescriptors || !LocalBufferBlockPointers || !LocalRefCount || !LocalBufferBlockPointers_save)
 		ereport(FATAL,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of memory")));

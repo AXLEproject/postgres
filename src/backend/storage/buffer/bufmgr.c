@@ -53,7 +53,7 @@
 
 
 /* Note: these two macros only work on shared buffers, not local ones! */
-#define BufHdrGetBlock(bufHdr)	((Block) (BufferBlocks + ((Size) (bufHdr)->buf_id) * BLCKSZ))
+#define BufHdrGetBlock(bufHdr) ((Block)(BufferBlocksPtr[(bufHdr)->buf_id]))
 #define BufferGetLSN(bufHdr)	(PageGetLSN(BufHdrGetBlock(bufHdr)))
 
 /* Note: this macro only works on local buffers, not shared ones! */
@@ -748,6 +748,15 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 	 */
 	Assert(!(bufHdr->flags & BM_VALID));		/* spinlock not needed */
 
+        if (!found) {
+            /* AAS: Reset the Buffer pointers to their original values before reusing them */
+            if(isLocalBuf) {
+                LocalBufferBlockPointers[-((bufHdr)->buf_id + 2)] = LocalBufferBlockPointers_save[-((bufHdr)->buf_id + 2)];
+            } else {
+                BufferBlocksPtr[bufHdr->buf_id] = BufferBlocksPtr_save[bufHdr->buf_id];
+            }
+        }
+
 	bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
 
 	if (isExtend)
@@ -773,7 +782,14 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 			if (track_io_timing)
 				INSTR_TIME_SET_CURRENT(io_start);
 
-			smgrread(smgr, forkNum, blockNum, (char *) bufBlock);
+                        /* AAS: Get the ptr2ptr from vectors. smgrread will redirect these to the PM data */
+                        /* Would &bufBlock work? */
+                        if (isLocalBuf) {
+                            smgrread(smgr, forkNum, blockNum,(char**)(&(LocalBufHdrGetBlock(bufHdr))));
+                        } else {
+                            smgrread(smgr, forkNum, blockNum,(char**)(&(BufferBlocksPtr[(bufHdr)->buf_id])));
+                            /*smgrread(smgr, forkNum, blockNum,(char**)(&(BufHdrGetBlock(bufHdr))));*/
+                        }
 
 			if (track_io_timing)
 			{
@@ -1352,6 +1368,17 @@ MarkBufferDirty(Buffer buffer)
 	}
 
 	bufHdr->flags |= (BM_DIRTY | BM_JUST_DIRTIED);
+
+        /* 
+         * AAS: If the buffer is pointing to the actual PM data, we need to copy the buffer over
+         * to a DRAM buffer, or we would be writting directly in PM data.
+         */
+        if (BufferBlocksPtr[bufHdr->buf_id] != BufferBlocksPtr_save[bufHdr->buf_id]) {
+            if (memcpy(BufferBlocksPtr_save[bufHdr->buf_id], BufferBlocksPtr[bufHdr->buf_id], BLCKSZ) != BufferBlocksPtr_save[bufHdr->buf_id]) {
+                Assert(false);
+            }
+            BufferBlocksPtr[bufHdr->buf_id] = BufferBlocksPtr_save[bufHdr->buf_id];
+        }
 
 	UnlockBufHdr(bufHdr);
 }
@@ -3110,6 +3137,18 @@ MarkBufferDirtyHint(Buffer buffer, bool buffer_std)
 				PageSetLSN(page, lsn);
 		}
 		bufHdr->flags |= (BM_DIRTY | BM_JUST_DIRTIED);
+
+                /* 
+                 * AAS: If the buffer is pointing to the actual PM data, we need to copy the buffer over
+                 * to a DRAM buffer, or we would be writting directly in PM data.
+                 */
+                if (BufferBlocksPtr[bufHdr->buf_id] != BufferBlocksPtr_save[bufHdr->buf_id]) {
+                    if (memcpy(BufferBlocksPtr_save[bufHdr->buf_id], BufferBlocksPtr[bufHdr->buf_id], BLCKSZ) != BufferBlocksPtr_save[bufHdr->buf_id]) {
+                        Assert(false);
+                    }
+                    BufferBlocksPtr[bufHdr->buf_id] = BufferBlocksPtr_save[bufHdr->buf_id];
+                }
+
 		UnlockBufHdr(bufHdr);
 
 		if (delayChkpt)

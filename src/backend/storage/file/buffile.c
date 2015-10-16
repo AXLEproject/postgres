@@ -254,7 +254,7 @@ BufFileLoadBuffer(BufFile *file)
 	/*
 	 * Read whatever we can get, up to a full bufferload.
 	 */
-	file->nbytes = FileRead(thisfile, file->buffer, sizeof(file->buffer));
+	file->nbytes = FileRead(thisfile, (char**)(&(file->buffer)), sizeof(file->buffer));
 	if (file->nbytes < 0)
 		file->nbytes = 0;
 	file->offsets[file->curFile] += file->nbytes;

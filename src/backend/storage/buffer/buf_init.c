@@ -20,6 +20,8 @@
 
 BufferDescPadded *BufferDescriptors;
 char	   *BufferBlocks;
+char	   **BufferBlocksPtr;
+char	   **BufferBlocksPtr_save;
 
 
 /*
@@ -64,8 +66,10 @@ char	   *BufferBlocks;
 void
 InitBufferPool(void)
 {
-	bool		foundBufs,
-				foundDescs;
+	bool		foundBufs;
+	bool 		foundDescs;
+        bool            foundBufsPtr;
+        int             i;
 
 	/* Align descriptors to a cacheline boundary. */
 	BufferDescriptors = (BufferDescPadded *) CACHELINEALIGN(
@@ -76,16 +80,25 @@ InitBufferPool(void)
 	BufferBlocks = (char *)
 		ShmemInitStruct("Buffer Blocks",
 						NBuffers * (Size) BLCKSZ, &foundBufs);
+        /* AAS: Allocate vector of pointers and its copy */
+        BufferBlocksPtr = (char**) ShmemInitStruct("Buffer Blocks Ptr", NBuffers * sizeof(BufferBlocks), &foundBufsPtr);
+        BufferBlocksPtr_save = (char**) ShmemInitStruct("Buffer Blocks Ptr Save", NBuffers * sizeof(BufferBlocks), &foundBufsPtr);
 
-	if (foundDescs || foundBufs)
+	if (foundDescs || foundBufs || foundBufsPtr)
 	{
-		/* both should be present or neither */
-		Assert(foundDescs && foundBufs);
+		/* all should be present or neither */
+		Assert(foundDescs && foundBufs && foundBufsPtr);
 		/* note: this path is only taken in EXEC_BACKEND case */
 	}
 	else
 	{
-		int			i;
+                /* 
+                 * AAS: Initialize the vector of pointers and save a copy 
+                 */
+                for(i =  0; i < NBuffers; i++) {
+                    BufferBlocksPtr[i] = (char*)BufferBlocks + (i * BLCKSZ);
+                    BufferBlocksPtr_save[i] = BufferBlocksPtr[i];
+                }
 
 		/*
 		 * Initialize all the buffer headers.
@@ -135,6 +148,7 @@ BufferShmemSize(void)
 
 	/* size of buffer descriptors */
 	size = add_size(size, mul_size(NBuffers, sizeof(BufferDescPadded)));
+	size = add_size(size, mul_size(NBuffers*2, sizeof(BufferBlocks)));
 	/* to allow aligning buffer descriptors */
 	size = add_size(size, PG_CACHE_LINE_SIZE);
 

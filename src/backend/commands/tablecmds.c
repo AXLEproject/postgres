@@ -9824,6 +9824,7 @@ copy_relation_data(SMgrRelation src, SMgrRelation dst,
 				   ForkNumber forkNum, char relpersistence)
 {
 	char	   *buf;
+	char	   *buf_save;
 	Page		page;
 	bool		use_wal;
 	BlockNumber nblocks;
@@ -9836,6 +9837,7 @@ copy_relation_data(SMgrRelation src, SMgrRelation dst,
 	 * mention possibly making log_newpage's accesses to the page header fail.
 	 */
 	buf = (char *) palloc(BLCKSZ);
+        buf_save = buf;
 	page = (Page) buf;
 
 	/*
@@ -9851,7 +9853,7 @@ copy_relation_data(SMgrRelation src, SMgrRelation dst,
 		/* If we got a cancel signal during the copy of the data, quit */
 		CHECK_FOR_INTERRUPTS();
 
-		smgrread(src, forkNum, blkno, buf);
+		smgrread(src, forkNum, blkno, &buf);
 
 		if (!PageIsVerified(page, blkno))
 			ereport(ERROR,
@@ -9880,7 +9882,7 @@ copy_relation_data(SMgrRelation src, SMgrRelation dst,
 		smgrextend(dst, forkNum, blkno, buf, true);
 	}
 
-	pfree(buf);
+	pfree(buf_save);
 
 	/*
 	 * If the rel is WAL-logged, must fsync before commit.  We use heap_sync

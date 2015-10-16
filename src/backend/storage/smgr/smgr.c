@@ -50,7 +50,7 @@ typedef struct f_smgr
 	void		(*smgr_prefetch) (SMgrRelation reln, ForkNumber forknum,
 											  BlockNumber blocknum);
 	void		(*smgr_read) (SMgrRelation reln, ForkNumber forknum,
-										  BlockNumber blocknum, char *buffer);
+										  BlockNumber blocknum, char **buffer);
 	void		(*smgr_write) (SMgrRelation reln, ForkNumber forknum,
 						 BlockNumber blocknum, char *buffer, bool skipFsync);
 	BlockNumber (*smgr_nblocks) (SMgrRelation reln, ForkNumber forknum);
@@ -639,7 +639,7 @@ smgrprefetch(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum)
  */
 void
 smgrread(SMgrRelation reln, ForkNumber forknum, BlockNumber blocknum,
-		 char *buffer)
+		 char **buffer)
 {
 	(*(smgrsw[reln->smgr_which].smgr_read)) (reln, forknum, blocknum, buffer);
 }
