@@ -135,7 +135,7 @@ int			max_safe_fds = 32;	/* default if not changed */
 
 /* Debugging.... */
 
-#define FDDEBUG 0
+//#define FDDEBUG 0
 #ifdef FDDEBUG
 #define DO_DB(A) \
 	do { \
