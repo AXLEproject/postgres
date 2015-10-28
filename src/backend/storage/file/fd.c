@@ -314,6 +314,7 @@ static void walkdir(const char *path,
 static void pre_sync_fname(const char *fname, bool isdir, int elevel);
 #endif
 static void fsync_fname_ext(const char *fname, bool isdir, int elevel);
+static int getIdxFromSeekpos(File file);
 
 
 /*
@@ -1416,12 +1417,13 @@ retry:
         /* 
          * AAS: Redirect pointer to PM file.
          */
-        for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {
-            if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {
-                break;
-            }
-        }
-        Assert(i <= VfdCache[file].pm_list_idx);
+        /*for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {*/
+            /*if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {*/
+                /*break;*/
+            /*}*/
+        /*}*/
+        i = getIdxFromSeekpos(file);
+        Assert(i <= VfdCache[file].pm_list_idx && i >= 0);
         if (i == 0) delta = VfdCache[file].seekPos;
         else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
         Assert(delta >= 0);
@@ -1535,12 +1537,13 @@ retry:
         Assert(VfdCache[file].seekPos + amount <= VfdCache[file].pm_size_list[VfdCache[file].pm_list_idx]);
 
         /* AAS: Find the actual map ptr */
-        for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {
-            if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {
-                break;
-            }
-        }
-        Assert(i <= VfdCache[file].pm_list_idx);
+        /*for (i = 0; i <= VfdCache[file].pm_list_idx; i++) {*/
+            /*if (VfdCache[file].pm_size_list[i] > VfdCache[file].seekPos) {*/
+                /*break;*/
+            /*}*/
+        /*}*/
+        i = getIdxFromSeekpos(file);
+        Assert(i <= VfdCache[file].pm_list_idx && i >= 0);
         if (i == 0) delta = VfdCache[file].seekPos;
         else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
         Assert(delta >= 0);
@@ -2962,3 +2965,27 @@ fsync_fname_ext(const char *fname, bool isdir, int elevel)
 
 	(void) CloseTransientFile(fd);
 }
+
+static int getIdxFromSeekpos(File file)
+{
+    off_t low_idx, mid_idx, high_idx, range;
+    
+    low_idx = 0;
+    high_idx = VfdCache[file].pm_list_idx;
+    range = high_idx - low_idx;
+
+    while(range > 0) {
+        mid_idx = (high_idx + low_idx) / 2;
+        
+        if (VfdCache[file].seekPos < VfdCache[file].pm_size_list[mid_idx]) {
+            high_idx = mid_idx;
+        } else {
+            low_idx = mid_idx + 1;
+        }
+
+        range = high_idx - low_idx;
+    }
+    
+    return range;
+}
+
