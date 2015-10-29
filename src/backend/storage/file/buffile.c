@@ -226,7 +226,7 @@ BufFileClose(BufFile *file)
 static void
 BufFileLoadBuffer(BufFile *file)
 {
-	File		thisfile;
+    File		thisfile;
 
 	/*
 	 * Advance to next component file if necessary and possible.

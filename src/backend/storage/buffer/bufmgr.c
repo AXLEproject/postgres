@@ -798,7 +798,7 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				pgstat_count_buffer_read_time(INSTR_TIME_GET_MICROSEC(io_time));
 				INSTR_TIME_ADD(pgBufferUsage.blk_read_time, io_time);
 			}
-
+            bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
 			/* check for garbage data */
 			if (!PageIsVerified((Page) bufBlock, blockNum))
 			{

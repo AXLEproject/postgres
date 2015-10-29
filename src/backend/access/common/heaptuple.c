@@ -1112,7 +1112,7 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 	tp = (char *) tup + tup->t_hoff;
 
 	for (; attnum < natts; attnum++)
-	{
+	{        
 		Form_pg_attribute thisatt = att[attnum];
 
 		if (hasnulls && att_isnull(attnum, bp))
@@ -1187,7 +1187,7 @@ slot_getattr(TupleTableSlot *slot, int attnum, bool *isnull)
 {
 	HeapTuple	tuple = slot->tts_tuple;
 	TupleDesc	tupleDesc = slot->tts_tupleDescriptor;
-	HeapTupleHeader tup;
+	HeapTupleHeader tup;    
 
 	/*
 	 * system attributes are handled by heap_getsysattr
