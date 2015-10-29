@@ -1087,9 +1087,10 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 	Form_pg_attribute *att = tupleDesc->attrs;
 	int			attnum;
 	char	   *tp;				/* ptr to tuple data */
-	long		off;			/* offset in tuple data */
+    long		off;			/* offset in tuple data */
 	bits8	   *bp = tup->t_bits;		/* ptr to null bitmap in tuple */
 	bool		slow;			/* can we use/set attcacheoff? */
+    int remainder;
 
 	/*
 	 * Check whether the first call for this tuple, and initialize or restore
@@ -1125,34 +1126,45 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 
 		isnull[attnum] = false;
 
-		if (!slow && thisatt->attcacheoff >= 0)
-			off = thisatt->attcacheoff;
-		else if (thisatt->attlen == -1)
-		{
-			/*
-			 * We can only cache the offset for a varlena attribute if the
-			 * offset is already suitably aligned, so that there would be no
-			 * pad bytes in any case: then the offset will be valid for either
-			 * an aligned or unaligned value.
-			 */
-			if (!slow &&
-				off == att_align_nominal(off, thisatt->attalign))
-				thisatt->attcacheoff = off;
-			else
-			{
-				off = att_align_pointer(off, thisatt->attalign, -1,
-										tp + off);
-				slow = true;
-			}
-		}
-		else
-		{
-			/* not varlena, so safe to use att_align_nominal */
-			off = att_align_nominal(off, thisatt->attalign);
+        if (!slow && thisatt->attcacheoff >= 0)
+            off = thisatt->attcacheoff;
+        else if (thisatt->attlen == -1)
+        {
+            /*
+             * We can only cache the offset for a varlena attribute if the
+             * offset is already suitably aligned, so that there would be no
+             * pad bytes in any case: then the offset will be valid for either
+             * an aligned or unaligned value.
+             */
+            if (!slow
+//                    &&
+//                off == att_align_nominal(off, thisatt->attalign)
+                    )
+                thisatt->attcacheoff = off;
+            else
+            {
+//                off = att_align_pointer(off, thisatt->attalign, -1,tp + off);
+                slow = true;
+            }
+        }
+        else
+        {
+            /* not varlena, so safe to use att_align_nominal */
+            //off = att_align_nominal(off, thisatt->attalign);//commented by Naveed
+            //===========================================================
+            //Naveed
+            //off= off+(thisatt->attalign);//added by Naveed
+            //off++;//added by naveed
+            remainder=(off)%(thisatt->attlen);
+            if(remainder!=0)
+            {
+                off=off+(thisatt->attlen)-remainder;
+            }
+            //===========================================================
+            if (!slow)
+                thisatt->attcacheoff = off;
 
-			if (!slow)
-				thisatt->attcacheoff = off;
-		}
+        }
 
 		values[attnum] = fetchatt(thisatt, tp + off);
 
