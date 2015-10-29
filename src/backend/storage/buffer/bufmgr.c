@@ -799,6 +799,9 @@ ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				INSTR_TIME_ADD(pgBufferUsage.blk_read_time, io_time);
 			}
 
+                        /* AAS: We need to get the bufBlock again since FileRead has probably redirected the buffer */
+	                bufBlock = isLocalBuf ? LocalBufHdrGetBlock(bufHdr) : BufHdrGetBlock(bufHdr);
+
 			/* check for garbage data */
 			if (!PageIsVerified((Page) bufBlock, blockNum))
 			{
