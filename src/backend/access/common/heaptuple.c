@@ -1089,7 +1089,7 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 	char	   *tp;				/* ptr to tuple data */
 	long		off;			/* offset in tuple data */
 	bits8	   *bp = tup->t_bits;		/* ptr to null bitmap in tuple */
-	bool		slow;			/* can we use/set attcacheoff? */
+    bool		slow;			/* can we use/set attcacheoff? */
 
 	/*
 	 * Check whether the first call for this tuple, and initialize or restore
@@ -1135,23 +1135,23 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 			 * pad bytes in any case: then the offset will be valid for either
 			 * an aligned or unaligned value.
 			 */
-			if (!slow &&
-				off == att_align_nominal(off, thisatt->attalign))
+            if (!slow &&
+                off == att_align_nominal(off, thisatt->attalign))
 				thisatt->attcacheoff = off;
 			else
 			{
-				off = att_align_pointer(off, thisatt->attalign, -1,
-										tp + off);
+                off = att_align_pointer(off, thisatt->attalign, -1,
+                                        tp + off);
 				slow = true;
 			}
 		}
 		else
 		{
-			/* not varlena, so safe to use att_align_nominal */
-			off = att_align_nominal(off, thisatt->attalign);
+            /* not varlena, so safe to use att_align_nominal */
+            off = att_align_nominal(off, thisatt->attalign);
 
-			if (!slow)
-				thisatt->attcacheoff = off;
+            if (!slow)
+                thisatt->attcacheoff = off;
 		}
 
 		values[attnum] = fetchatt(thisatt, tp + off);
