@@ -1090,6 +1090,7 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 	long		off;			/* offset in tuple data */
 	bits8	   *bp = tup->t_bits;		/* ptr to null bitmap in tuple */
     bool		slow;			/* can we use/set attcacheoff? */
+    int remainder;//added by Naveed
 
 	/*
 	 * Check whether the first call for this tuple, and initialize or restore
@@ -1147,19 +1148,34 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 		}
 		else
 		{
-            /* not varlena, so safe to use att_align_nominal */
-            off = att_align_nominal(off, thisatt->attalign);
+//            /* not varlena, so safe to use att_align_nominal */
+//            off = att_align_nominal(off, thisatt->attalign);
 
+//            if (!slow)
+//                thisatt->attcacheoff = off;
+
+
+            //===========================================================
+            //Naveed
+            remainder=(off)%(thisatt->attlen);
+            if(remainder!=0)
+            {
+                off=off+(thisatt->attlen)-remainder;
+            }
             if (!slow)
                 thisatt->attcacheoff = off;
-		}
+            //===========================================================
 
-		values[attnum] = fetchatt(thisatt, tp + off);
 
-		off = att_addlength_pointer(off, thisatt->attlen, tp + off);
 
-		if (thisatt->attlen <= 0)
-			slow = true;		/* can't use attcacheoff anymore */
+        }
+
+        values[attnum] = fetchatt(thisatt, tp + off);
+
+        off = att_addlength_pointer(off, thisatt->attlen, tp + off);
+
+        if (thisatt->attlen <= 0)
+            slow = true;		/* can't use attcacheoff anymore */
 	}
 
 	/*
