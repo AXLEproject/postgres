@@ -1137,13 +1137,13 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
              * an aligned or unaligned value.
              */
             if (!slow
-//                    &&
-//                off == att_align_nominal(off, thisatt->attalign)
+                    &&
+                off == att_align_nominal(off, thisatt->attalign)
                     )
                 thisatt->attcacheoff = off;
             else
             {
-//                off = att_align_pointer(off, thisatt->attalign, -1,tp + off);
+                off = att_align_pointer(off, thisatt->attalign, -1,tp + off);
                 slow = true;
             }
         }
