@@ -1148,26 +1148,11 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 		}
 		else
 		{
-//            /* not varlena, so safe to use att_align_nominal */
-//            off = att_align_nominal(off, thisatt->attalign);
+            /* not varlena, so safe to use att_align_nominal */
+            off = att_align_nominal(off, thisatt->attalign);
 
-//            if (!slow)
-//                thisatt->attcacheoff = off;
-
-
-            //===========================================================
-            //Naveed
-            remainder=(off)%(thisatt->attlen);
-            if(remainder!=0)
-            {
-                off=off+(thisatt->attlen)-remainder;
-            }
             if (!slow)
                 thisatt->attcacheoff = off;
-            //===========================================================
-
-
-
         }
 
         values[attnum] = fetchatt(thisatt, tp + off);
