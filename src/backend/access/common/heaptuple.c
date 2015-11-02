@@ -1116,7 +1116,7 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 	{
 		Form_pg_attribute thisatt = att[attnum];
 
-		if (hasnulls && att_isnull(attnum, bp))
+        if (hasnulls && att_isnull(attnum, bp))//point1
 		{
 			values[attnum] = (Datum) 0;
 			isnull[attnum] = true;
@@ -1126,27 +1126,27 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
 
 		isnull[attnum] = false;
 
-		if (!slow && thisatt->attcacheoff >= 0)
+        if (!slow && thisatt->attcacheoff >= 0)//point2
 			off = thisatt->attcacheoff;
-		else if (thisatt->attlen == -1)
+        else if (thisatt->attlen == -1)//point3
 		{
 			/*
 			 * We can only cache the offset for a varlena attribute if the
 			 * offset is already suitably aligned, so that there would be no
 			 * pad bytes in any case: then the offset will be valid for either
 			 * an aligned or unaligned value.
-			 */
+             *///point4
             if (!slow &&
                 off == att_align_nominal(off, thisatt->attalign))
 				thisatt->attcacheoff = off;
-			else
+            else//point5
 			{
                 off = att_align_pointer(off, thisatt->attalign, -1,
                                         tp + off);
 				slow = true;
 			}
 		}
-		else
+        else//point6
 		{
             /* not varlena, so safe to use att_align_nominal */
             off = att_align_nominal(off, thisatt->attalign);
