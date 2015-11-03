@@ -1111,6 +1111,12 @@ slot_deform_tuple(TupleTableSlot *slot, int natts)
     }
 
     tp = (char *) tup + tup->t_hoff;
+    //char *ptup=(tp)&(char *)(~0x3FULL);
+    //char *ptup=(tp);
+    //__builtin_prefetch((const void*)(ptup+512), 0, 3);
+    //__builtin_prefetch((const void*)(ptup+1024), 0, 3);
+    //__builtin_prefetch((const void*)(ptup+192), 0, 3);
+    //__builtin_prefetch((const void*)(ptup+256), 0, 3);
 
     for (; attnum < natts; attnum++)
     {

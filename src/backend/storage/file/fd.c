@@ -1388,7 +1388,7 @@ int
 FileRead(File file, char **buffer, int amount)
 {
 	int			returnCode;
-        int i;
+        int i,j;
         off_t delta;
 
 	Assert(FileIsValid(file));
@@ -1428,6 +1428,7 @@ retry:
         else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
         Assert(delta >= 0);
         *buffer = (char*) VfdCache[file].pm_ptr_list[i] + delta;
+        //printf(".%.10s\n", *buffer);
 
         returnCode = amount;
 	if (returnCode >= 0)

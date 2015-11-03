@@ -86,9 +86,7 @@ struct BufFile
 	off_t		curOffset;		/* offset part of current pos */
 	int			pos;			/* next read/write position in buffer */
 	int			nbytes;			/* total # of valid bytes in buffer */
-    char		buffer[BLCKSZ];//commented by Naveed
-    //char		buffer_copy[BLCKSZ];  //added by Naveed
-    //char        *buffer;//added by Naveed
+    char		buffer[BLCKSZ];
 };
 
 static BufFile *makeBufFile(File firstfile);
@@ -119,7 +117,7 @@ makeBufFile(File firstfile)
 	file->curFile = 0;
 	file->curOffset = 0L;
 	file->pos = 0;
-	file->nbytes = 0;    
+	file->nbytes = 0;
 	return file;
 }
 
@@ -225,8 +223,9 @@ BufFileClose(BufFile *file)
 static void
 BufFileLoadBuffer(BufFile *file)
 {
-    File		thisfile;
-    char        *tempPtr;
+	File		thisfile;
+        char* tmpPtr;
+
 	/*
 	 * Advance to next component file if necessary and possible.
 	 *
@@ -255,15 +254,13 @@ BufFileLoadBuffer(BufFile *file)
 	/*
 	 * Read whatever we can get, up to a full bufferload.
 	 */
-    //file->nbytes = FileRead(thisfile, (char**)(&(file->buffer)), sizeof(file->buffer));
-    tempPtr=NULL;
-    file->nbytes = FileRead(thisfile, &tempPtr, sizeof(file->buffer));
-    if((file->nbytes)>0)
-    {
-        memcpy(file->buffer,tempPtr,sizeof(file->buffer));
-    }
+        tmpPtr = NULL;
+        //file->nbytes = FileRead(thisfile, (char**)(&(file->buffer)), sizeof(file->buffer));
+        file->nbytes = FileRead(thisfile, &tmpPtr, sizeof(file->buffer));
+        if (file->nbytes > 0) {
+            memcpy(file->buffer, tmpPtr, sizeof(file->buffer));
+        }
 
-    //file->nbytes = FileRead(thisfile, &(file->buffer), sizeof(file->buffer_copy));
 	if (file->nbytes < 0)
 		file->nbytes = 0;
 	file->offsets[file->curFile] += file->nbytes;
@@ -441,14 +438,7 @@ BufFileWrite(BufFile *file, void *ptr, size_t size)
 		if (nthistime > size)
 			nthistime = size;
 		Assert(nthistime > 0);
-        //===========================================================
-//        //Naveed
-//        if((file->buffer)!=((char*)&(file->buffer_copy)))//undo redirection
-//        {
-//            memcpy(file->buffer_copy,file->buffer,BLCKSZ);
-//            file->buffer=((char*)&(file->buffer_copy));
-//        }
-        //===========================================================
+
 		memcpy(file->buffer + file->pos, ptr, nthistime);
 
 		file->dirty = true;
