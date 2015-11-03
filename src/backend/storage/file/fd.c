@@ -135,7 +135,7 @@ int			max_safe_fds = 32;	/* default if not changed */
 
 /* Debugging.... */
 
-//#define FDDEBUG 0
+/*#define FDDEBUG 1*/
 #ifdef FDDEBUG
 #define DO_DB(A) \
 	do { \
@@ -1367,10 +1367,10 @@ FileRead(File file, char *buffer, int amount)
 	Assert(FileIsValid(file));
 	Assert(FileIsMapped(file));
 
-	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
+	DO_DB(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p %p",
 			   file, VfdCache[file].fileName,
 			   (int64) VfdCache[file].seekPos,
-			   amount, buffer));
+			   amount, buffer, VfdCache[file].pm_ptr));
 
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
@@ -1378,6 +1378,13 @@ FileRead(File file, char *buffer, int amount)
 
 retry:
 	/*returnCode = read(VfdCache[file].fd, buffer, amount);*/
+
+        /* Check if amount is higher than the actual amount of bytes left
+         * in file to read. This can happen in temporary files.
+         */
+        if (VfdCache[file].seekPos + amount > VfdCache[file].pm_size) {
+            amount = VfdCache[file].pm_size - VfdCache[file].seekPos;
+        }
 
         if (memcpy(buffer, (char*)VfdCache[file].pm_ptr + VfdCache[file].seekPos, amount) != buffer) {
             returnCode = -1;
