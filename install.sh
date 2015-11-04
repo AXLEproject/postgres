@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR"; pwd)
@@ -8,7 +8,7 @@ DEST=$BASEDIR/build/pg_pmfs_experimental/bin/postgres
 if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         # compile
         mkdir -p $BASEDIR/build/pg_pmfs_experimental
-        #cd $BASEDIR/build
+        cd $BASEDIR/build/pg_pmfs_experimental
         CFLAGS="-fno-omit-frame-pointer -rdynamic -O2" $BASEDIR/configure --prefix=$BASEDIR/build/pg_pmfs_experimental --with-blocksize=8 --with-wal-blocksize=8
         #make clean
         make -j$(grep -c ^processor /proc/cpuinfo)
