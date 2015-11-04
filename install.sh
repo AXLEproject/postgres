@@ -3,12 +3,12 @@
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR"; pwd)
 
-DEST=$BASEDIR/build/base95/bin/postgres/
+DEST=$BASEDIR/build/base95/bin/postgres
 
 if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         # compile
         mkdir -p $BASEDIR/build/base95
-        #cd $BASEDIR/build
+        cd $BASEDIR/build/base95
         CFLAGS="-fno-omit-frame-pointer -rdynamic -O2" $BASEDIR/configure --prefix=$BASEDIR/build/base95 --with-blocksize=8 --with-wal-blocksize=8
         #make clean
         make -j$(grep -c ^processor /proc/cpuinfo)
