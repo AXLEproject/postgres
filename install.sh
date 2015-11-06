@@ -9,7 +9,7 @@ if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         # compile
         mkdir -p $BASEDIR/../pg-build/pg_pmfs
         cd $BASEDIR/../pg-build/pg_pmfs
-        CFLAGS="-fno-omit-frame-pointer -rdynamic -O2" $BASEDIR/configure --prefix=$BASEDIR/../pg-build/pg_pmfs --with-blocksize=8 --with-wal-blocksize=8
+        CFLAGS="-O2" $BASEDIR/configure --prefix=$BASEDIR/../pg-build/pg_pmfs --with-blocksize=8 --with-wal-blocksize=8
         #make clean
         make -j$(grep -c ^processor /proc/cpuinfo)
         make install
