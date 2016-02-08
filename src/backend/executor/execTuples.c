@@ -352,13 +352,15 @@ ExecStoreTuple(HeapTuple tuple,
 	slot->tts_tuple = tuple;
 	slot->tts_mintuple = NULL;
 
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 128);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 192);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 64);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 128);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 192);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 256);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 320);*/
         /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 384);*/
         /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 448);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 512);*/
+        /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 576);*/
 
 	/* Mark extracted state invalid */
 	slot->tts_nvalid = 0;

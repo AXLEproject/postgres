@@ -420,6 +420,10 @@ heapgetpage(HeapScanDesc scan, BlockNumber page)
 			loctup.t_data = (HeapTupleHeader) PageGetItem((Page) dp, lpp);
 			loctup.t_len = ItemIdGetLength(lpp);
 			ItemPointerSet(&(loctup.t_self), page, lineoff);
+        
+                        /*__builtin_prefetch((void*) ((char*)loctup.t_data));*/
+                        /*__builtin_prefetch((void*) ((char*)loctup.t_data + 64));*/
+                        /*__builtin_prefetch((void*) ((char*)loctup.t_data + 128));*/
 
 			if (all_visible)
 				valid = true;
@@ -1697,6 +1701,9 @@ heap_fetch(Relation relation,
 	tuple->t_len = ItemIdGetLength(lp);
 	tuple->t_tableOid = RelationGetRelid(relation);
 
+                        /*__builtin_prefetch((void*) ((char*)tuple->t_data));*/
+                        /*__builtin_prefetch((void*) ((char*)tuple->t_data + 64));*/
+                        /*__builtin_prefetch((void*) ((char*)tuple->t_data + 128));*/
 	/*
 	 * check time qualification of tuple, then release lock
 	 */
@@ -1812,6 +1819,10 @@ heap_hot_search_buffer(ItemPointer tid, Relation relation, Buffer buffer,
 		heapTuple->t_len = ItemIdGetLength(lp);
 		heapTuple->t_tableOid = RelationGetRelid(relation);
 		ItemPointerSetOffsetNumber(&heapTuple->t_self, offnum);
+                        
+                /*__builtin_prefetch((void*) ((char*)heapTuple->t_data));*/
+                /*__builtin_prefetch((void*) ((char*)heapTuple->t_data + 64));*/
+                /*__builtin_prefetch((void*) ((char*)heapTuple->t_data + 128));*/
 
 		/*
 		 * Shouldn't see a HEAP_ONLY tuple at chain start.
