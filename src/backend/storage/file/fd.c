@@ -1429,8 +1429,8 @@ retry:
         Assert(delta >= 0);
         *buffer = (char*) VfdCache[file].pm_ptr_list[i] + delta;
 
-        __builtin_prefetch((void*) ((char*)*buffer));
-        __builtin_prefetch((void*) ((char*)*buffer) + 64);
+//        __builtin_prefetch((void*) ((char*)*buffer));
+//        __builtin_prefetch((void*) ((char*)*buffer) + 64);
 
 
         returnCode = amount;
