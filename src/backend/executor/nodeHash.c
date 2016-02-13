@@ -1063,7 +1063,7 @@ ExecScanHashBucket(HashJoinState *hjstate,
 	List	   *hjclauses = hjstate->hashclauses;
 	HashJoinTable hashtable = hjstate->hj_HashTable;
 	HashJoinTuple hashTuple = hjstate->hj_CurTuple;
-	uint32		hashvalue = hjstate->hj_CurHashValue;
+	uint32		hashvalue = hjstate->hj_CurHashValue;    
 
 	/*
 	 * hj_CurTuple is the address of the tuple last returned from the current
@@ -1072,8 +1072,8 @@ ExecScanHashBucket(HashJoinState *hjstate,
 	 * If the tuple hashed to a skew bucket then scan the skew bucket
 	 * otherwise scan the standard hashtable bucket.
 	 */
-	if (hashTuple != NULL)
-		hashTuple = hashTuple->next;
+	if (hashTuple != NULL)    
+        hashTuple = hashTuple->next;//Here we are having most cache-misses
 	else if (hjstate->hj_CurSkewBucketNo != INVALID_SKEW_BUCKET_NO)
 		hashTuple = hashtable->skewBucket[hjstate->hj_CurSkewBucketNo]->tuples;
 	else

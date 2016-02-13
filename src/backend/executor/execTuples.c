@@ -334,6 +334,7 @@ ExecStoreTuple(HeapTuple tuple,
 	Assert(slot->tts_tupleDescriptor != NULL);
 	/* passing shouldFree=true for a tuple on a disk page is not sane */
 	Assert(BufferIsValid(buffer) ? (!shouldFree) : true);
+    Page temp_Page=BufferGetPage(buffer);
 
 	/*
 	 * Free any old physical tuple belonging to the slot.
@@ -352,12 +353,16 @@ ExecStoreTuple(HeapTuple tuple,
 	slot->tts_tuple = tuple;
 	slot->tts_mintuple = NULL;
 
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 128);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 192);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
-        __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
+        //if(temp_Page!=0)
+        {
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 128);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 192);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
+        }
+
         /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 448);*/
         /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 512);*/
         /*__builtin_prefetch((void*) ((char*)tuple->t_data) - 576);*/

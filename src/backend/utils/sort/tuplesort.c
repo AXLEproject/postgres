@@ -1658,8 +1658,13 @@ static bool
 tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 						  SortTuple *stup, bool *should_free)
 {
+//    //================================================
+//    //Naveed
+//    unsigned int tempIndex;
+//    unsigned int jump=3;
+//    SortTuple *TempSortTuple;
+//    //================================================
 	unsigned int tuplen;
-
 	switch (state->status)
 	{
 		case TSS_SORTEDINMEM:
@@ -1669,7 +1674,7 @@ tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 			{
 				if (state->current < state->memtupcount)
 				{
-					*stup = state->memtuples[state->current++];
+                    *stup = state->memtuples[state->current++];
 					return true;
 				}
 				state->eof_reached = true;
@@ -1701,7 +1706,7 @@ tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 					if (state->current <= 0)
 						return false;
 				}
-				*stup = state->memtuples[state->current - 1];
+                *stup = state->memtuples[state->current - 1];
 				return true;
 			}
 			break;
