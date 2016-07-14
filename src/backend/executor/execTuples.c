@@ -358,9 +358,9 @@ ExecStoreTuple(HeapTuple tuple,
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 128);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 192);
-//            __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
-//            __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
-//            __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
+            __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
         }
 
 
