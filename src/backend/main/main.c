@@ -37,6 +37,9 @@
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/ps_status.h"
+//Naveed
+//#include "/home/naveed/repos/postgres/src/backend/HelperThread.h"
+//#include <pthread.h>
 
 
 const char *progname;
@@ -47,7 +50,34 @@ static void init_locale(const char *categoryname, int category, const char *loca
 static void help(const char *progname);
 static void check_root(const char *progname);
 
+//Naveed
+/*
+struct HT_args {
+  void *startAddr;
+  int NumberOfBytes;
+  int direction;
+};
+//define your helper thread source code here
+//startAddr: Addres to fetch data from
+//NumberOfBytes: Number of bytes to be fetched, this argument must be multiple of 64 with smallest possible
+//value of 64
+//direction: 1= forward, -1=backword
 
+//void* HelperThread(void *startAddr, int NumberOfBytes, int direction)
+void* HelperThread(struct HT_args arg)
+{
+    printf("\n thread is processing.\n");
+    int LineSize=64;
+    int loopcount=(arg.NumberOfBytes)/LineSize;
+    int i, ret1;
+    for(i=0;i<loopcount;++i)
+    {
+        __builtin_prefetch((arg.startAddr) + ((arg.direction)*i*LineSize) );
+    }
+    pthread_exit(&ret1);
+    return NULL;
+}
+*/
 /*
  * Any Postgres server process begins execution here.
  */

@@ -79,6 +79,10 @@
 #include "utils/resowner_private.h"
 
 #include <sys/mman.h>
+//Naveed
+//========================
+#include "HelperThread.h"
+//========================
 
 /* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
 #if defined(HAVE_SYNC_FILE_RANGE)
@@ -1082,6 +1086,55 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
                     errno = save_errno;
                     return -1;
             }
+            //Naveed
+            //==============================
+
+            int err,attrRtrn, s,j;
+            pthread_t thread_id;
+            pthread_attr_t attr;
+            attrRtrn = pthread_attr_init(&attr);
+
+            struct HT_args arg;
+            arg.startAddr=vfdP->pm_size_list[0];
+            arg.direction=1;
+            arg.NumberOfBytes=vfdP->pm_size_list[0];
+            //set attributes of thread in such a way that thread is pinned to a different core
+            //than main application
+            int speid=15;
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(speid, &cpuset);
+            pthread_t thread = pthread_self();
+
+
+            s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+            /*
+            if (s != 0) {
+                handle_error_en(s, "pthread_getaffinity_np");
+            }*/
+            printf("cpuset=%d\n",cpuset);
+            printf("Set returned by pthread_getaffinity_np() contained:\n");
+            for (j = 0; j < CPU_SETSIZE; j++) {
+                if (CPU_ISSET(j, &cpuset)) {
+                    printf("%d CPU %d\n",speid, j);
+                }
+
+            }
+/*
+            err = pthread_create(&thread_id, NULL, &HelperThread,&arg);
+            if (err != 0)
+                return -1;
+*/
+
+            /*
+            if (err != 0)
+                printf("\ncan't create thread :[%s]", strerror(err));
+            else
+                printf("\n Thread created successfully\n");
+                */
+//            pthread_join(thread_id, NULL);
+
+            //==============================
             vfdP->pm_list_idx++;
         } else {
             /* Cannot mmap at this point, file must have size > 0 */

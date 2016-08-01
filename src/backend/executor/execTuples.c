@@ -352,7 +352,7 @@ ExecStoreTuple(HeapTuple tuple,
 	slot->tts_shouldFreeMin = false;
 	slot->tts_tuple = tuple;
 	slot->tts_mintuple = NULL;
-
+/*
         if(temp_Page!=0)
         {
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
@@ -362,7 +362,7 @@ ExecStoreTuple(HeapTuple tuple,
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
         }
-
+*/
 
 
 	/* Mark extracted state invalid */
