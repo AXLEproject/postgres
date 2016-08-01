@@ -1103,7 +1103,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
             int speid=15;
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
-            CPU_SET(speid, &cpuset);
+            //CPU_SET(speid, &cpuset);
             pthread_t thread = pthread_self();
 
 
