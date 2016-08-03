@@ -82,7 +82,9 @@
 //Naveed
 //========================
 //#include "HelperThread.h"
-#include "ThreadPool/work.h"
+#include "threadPool/thpool.h"
+#include "threadPool/work.h"
+
 //========================
 
 /* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
@@ -1095,7 +1097,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
             arg.direction=1;
             arg.NumberOfBytes=vfdP->pm_size_list[0];
             //invoking the pool
-            thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
+            //thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
 /*
             int err;
 

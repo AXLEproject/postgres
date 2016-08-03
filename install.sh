@@ -5,7 +5,7 @@ BASEDIR=$(cd "$BASEDIR"; pwd)
 
 DEST=$BASEDIR/../pg-build/pg_pmfs_experimental/bin/postgres
 
-if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
+#if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         # compile
         mkdir -p $BASEDIR/../pg-build/pg_pmfs_experimental
         cd $BASEDIR/../pg-build/pg_pmfs_experimental
@@ -17,10 +17,10 @@ if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         make install
         #make clean
         echo "done"
-else
-        echo ""
-        echo "Already up to date. Skip compilation."
-fi
+#else
+#        echo ""
+#        echo "Already up to date. Skip compilation."
+#fi
 
 echo "Creating symlinks"
 rm -rf $BASEDIR/build/bin/

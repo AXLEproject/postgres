@@ -16,7 +16,8 @@
 
 #include "storage/bufmgr.h"
 #include "storage/buf_internals.h"
-#include "ThreadPool/work.h"
+//#include "ThreadPool/thpool.h"
+#include "threadPool/work.h"
 
 
 BufferDescPadded *BufferDescriptors;
