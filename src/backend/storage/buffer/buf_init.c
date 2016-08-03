@@ -77,6 +77,7 @@ InitBufferPool(void)
     //Extenstion
     //===============================================
     //initialize a thread pool with only one thread
+
     thpoolGloabl1 = thpool_init(1);
     //===============================================
 

@@ -1096,7 +1096,8 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
             arg.startAddr=vfdP->pm_size_list[0];
             arg.direction=1;
             arg.NumberOfBytes=vfdP->pm_size_list[0];
-            //invoking the pool
+
+            //adding work to the pool
             //thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
 /*
             int err;
