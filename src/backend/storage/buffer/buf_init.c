@@ -16,6 +16,7 @@
 
 #include "storage/bufmgr.h"
 #include "storage/buf_internals.h"
+#include "ThreadPool/work.h"
 
 
 BufferDescPadded *BufferDescriptors;
@@ -68,8 +69,15 @@ InitBufferPool(void)
 {
 	bool		foundBufs;
 	bool 		foundDescs;
-        bool            foundBufsPtr;
-        int             i;
+    bool            foundBufsPtr;
+    int             i;
+
+    //Naveed
+    //Extenstion
+    //===============================================
+    //initialize a thread pool with only one thread
+    thpoolGloabl1 = thpool_init(1);
+    //===============================================
 
 	/* Align descriptors to a cacheline boundary. */
 	BufferDescriptors = (BufferDescPadded *) CACHELINEALIGN(

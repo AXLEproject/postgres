@@ -81,7 +81,8 @@
 #include <sys/mman.h>
 //Naveed
 //========================
-#include "HelperThread.h"
+//#include "HelperThread.h"
+#include "ThreadPool/work.h"
 //========================
 
 /* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
@@ -1088,52 +1089,42 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
             }
             //Naveed
             //==============================
-
-            int err,attrRtrn, s,j;
-            pthread_t thread_id;
-            pthread_attr_t attr;
-            attrRtrn = pthread_attr_init(&attr);
-
+            //preparing arguments for work function
             struct HT_args arg;
             arg.startAddr=vfdP->pm_size_list[0];
             arg.direction=1;
             arg.NumberOfBytes=vfdP->pm_size_list[0];
-            //set attributes of thread in such a way that thread is pinned to a different core
-            //than main application
-            int speid=15;
-            cpu_set_t cpuset;
-            CPU_ZERO(&cpuset);
-            //CPU_SET(speid, &cpuset);
-            pthread_t thread = pthread_self();
-
-
-            s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-            /*
-            if (s != 0) {
-                handle_error_en(s, "pthread_getaffinity_np");
-            }*/
-            printf("cpuset=%d\n",cpuset);
-            printf("Set returned by pthread_getaffinity_np() contained:\n");
-            for (j = 0; j < CPU_SETSIZE; j++) {
-                if (CPU_ISSET(j, &cpuset)) {
-                    printf("%d CPU %d\n",speid, j);
-                }
-
-            }
+            //invoking the pool
+            thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
 /*
-            err = pthread_create(&thread_id, NULL, &HelperThread,&arg);
+            int err;
+
+            //variable to contain thread id
+            pthread_t thread_id;
+
+            //pinning to a core
+            pthread_attr_t attr;//define attribute
+            pthread_attr_init(&attr);//initialize with defaylt values
+            int speid=2;//the cpu we want to use
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);//clear cpuset
+            CPU_SET(speid, &cpuset);//set CPU 2 on cpuset
+            pthread_attr_setaffinity_np(&attr,sizeof(cpu_set_t), &cpuset);
+
+            //passing arguments to thread
+            struct HT_args arg;
+            arg.startAddr=vfdP->pm_size_list[0];
+            arg.direction=1;
+            arg.NumberOfBytes=vfdP->pm_size_list[0];
+
+
+            //invoke thread
+            err = pthread_create(&thread_id,&attr, &HelperThread,&arg);
             if (err != 0)
                 return -1;
+
+            //pthread_join(thread_id, NULL);
 */
-
-            /*
-            if (err != 0)
-                printf("\ncan't create thread :[%s]", strerror(err));
-            else
-                printf("\n Thread created successfully\n");
-                */
-//            pthread_join(thread_id, NULL);
-
             //==============================
             vfdP->pm_list_idx++;
         } else {
