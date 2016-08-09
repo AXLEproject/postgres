@@ -278,7 +278,25 @@ static int thread_init (thpool_* thpool_p, struct thread** thread_p, int id){
 	(*thread_p)->thpool_p = thpool_p;
 	(*thread_p)->id       = id;
 
-	pthread_create(&(*thread_p)->pthread, NULL, (void *)thread_do, (*thread_p));
+    //Naveed
+    //===============================================
+
+/*
+    pthread_attr_t attr;
+    cpu_set_t cpus;    
+
+    //pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t),&cpus);
+
+    pthread_attr_init(&attr);
+    CPU_ZERO(&cpus);
+    CPU_SET(3, &cpus);
+
+    pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+    pthread_create(&(*thread_p)->pthread, &attr, (void *)thread_do, (*thread_p));
+*/
+    //===============================================
+
+    pthread_create(&(*thread_p)->pthread, NULL, (void *)thread_do, (*thread_p));
 	pthread_detach((*thread_p)->pthread);
 	return 0;
 }

@@ -16,8 +16,8 @@
 
 #include "storage/bufmgr.h"
 #include "storage/buf_internals.h"
-//#include "ThreadPool/thpool.h"
-#include "threadPool/work.h"
+#include "thpool.h"
+#include "work.h"
 
 
 BufferDescPadded *BufferDescriptors;
@@ -77,8 +77,25 @@ InitBufferPool(void)
     //Extenstion
     //===============================================
     //initialize a thread pool with only one thread
-
-    thpoolGloabl1 = thpool_init(1);
+    /*
+    pid_t pid;
+    if ((pid = getpid()) < 0) {
+          perror("Buf_init.C unable to get pid");
+        }
+    else {
+          printf("Buf_init.C The process id is %d", pid);
+        }
+    printf("Before thpoolGlobal1=%d\n",(int)thpoolGloabl1);
+    printf("Making threadpool with 4 threads\n");
+    thpoolGloabl1 = thpool_init(4);
+    printf("After thpoolGlobal1=%d\n",(int)thpoolGloabl1);
+    */
+    /*
+    for (i=0; i<20; i++){
+        thpool_add_work(thpoolGloabl1, &task1, NULL);
+        thpool_add_work(thpoolGloabl1, &task2, NULL);
+        };
+        */
     //===============================================
 
 	/* Align descriptors to a cacheline boundary. */

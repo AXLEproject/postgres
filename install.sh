@@ -3,15 +3,15 @@
 BASEDIR=$(dirname "$0")
 BASEDIR=$(cd "$BASEDIR"; pwd)
 
-DEST=$BASEDIR/../pg-build/pg_pmfs_experimental/bin/postgres
+DEST=$BASEDIR/../pg-build/pg_pmfs_experimental_ext/bin/postgres
 
 #if [ ! -r $DEST ] || [ $(find src -newer $DEST | wc -l) -gt 0 ]; then
         # compile
-        mkdir -p $BASEDIR/../pg-build/pg_pmfs_experimental
-        cd $BASEDIR/../pg-build/pg_pmfs_experimental
-        #CFLAGS="-O2 -fno-omit-frame-pointer" $BASEDIR/configure --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental --with-blocksize=8 --with-wal-blocksize=8
-	CFLAGS="-O2 -pthread -fno-omit-frame-pointer" $BASEDIR/configure --enable-debug --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental --with-blocksize=8 --with-wal-blocksize=8
-	#CFLAGS="-O2 -fno-omit-frame-pointer" $BASEDIR/configure --enable-debug --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental --with-blocksize=8 --with-wal-blocksize=8
+        mkdir -p $BASEDIR/../pg-build/pg_pmfs_experimental_ext
+        cd $BASEDIR/../pg-build/pg_pmfs_experimental_ext
+        #CFLAGS="-O2 -fno-omit-frame-pointer" $BASEDIR/configure --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental_ext --with-blocksize=8 --with-wal-blocksize=8
+	CFLAGS="-O2 -pthread -fno-omit-frame-pointer" $BASEDIR/configure --enable-debug --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental_ext --with-blocksize=8 --with-wal-blocksize=8
+	#CFLAGS="-O2 -fno-omit-frame-pointer" $BASEDIR/configure --enable-debug --prefix=$BASEDIR/../pg-build/pg_pmfs_experimental_ext --with-blocksize=8 --with-wal-blocksize=8
         #make clean
         make -j$(grep -c ^processor /proc/cpuinfo)
         make install
@@ -25,7 +25,7 @@ DEST=$BASEDIR/../pg-build/pg_pmfs_experimental/bin/postgres
 echo "Creating symlinks"
 rm -rf $BASEDIR/build/bin/
 mkdir -p $BASEDIR/build/bin/
-ln -s $BASEDIR/../pg-build/pg_pmfs_experimental/bin/* $BASEDIR/build/bin
+ln -s $BASEDIR/../pg-build/pg_pmfs_experimental_ext/bin/* $BASEDIR/build/bin
 
 echo "Add 'PGPATH=$BASEDIR' to your environment."
 

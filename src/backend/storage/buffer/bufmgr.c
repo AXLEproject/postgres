@@ -600,7 +600,7 @@ ReadBufferWithoutRelcache(RelFileNode rnode, ForkNumber forkNum,
 static Buffer
 ReadBuffer_common(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 				  BlockNumber blockNum, ReadBufferMode mode,
-				  BufferAccessStrategy strategy, bool *hit)
+                  BufferAccessStrategy strategy, bool *hit)
 {
 	volatile BufferDesc *bufHdr;
 	Block		bufBlock;

@@ -1,4 +1,10 @@
-#include "threadPool/thpool.h"
+#include <pthread.h>
+#include "thpool.h"
+#define DIRECTION 1
+
+
+
+
 /*
 Struct to pass arguments to the prefetchData function
 startAddr: Addres to fetch data from
@@ -7,13 +13,18 @@ value of 64
 direction: 1= forward, -1=backword
 */
 struct HT_args {
-  void *startAddr;
+  char *srcAddr;
+  char *destBuffer;
   int NumberOfBytes;
-  int direction;
+  char direction;
 };
 /*
 prefetchData which starts fetching "NumberOfBtes" data from memory into the cache starting from "startAddress" in "direction".
 */
-void* prefetchData(void *argRcvd);
+void prefetchData(void *argRcvd);
 //
 threadpool thpoolGloabl1;
+
+void task1();
+
+void task2();

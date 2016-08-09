@@ -91,6 +91,8 @@
 #include "utils/expandeddatum.h"
 #include "utils/lsyscache.h"
 #include "utils/typcache.h"
+//Naveed
+#include "work.h"
 
 
 static TupleDesc ExecTypeFromTLInternal(List *targetList,
@@ -352,6 +354,10 @@ ExecStoreTuple(HeapTuple tuple,
 	slot->tts_shouldFreeMin = false;
 	slot->tts_tuple = tuple;
 	slot->tts_mintuple = NULL;
+
+    //Naveed
+    //==================================================    
+
 /*
         if(temp_Page!=0)
         {
@@ -363,7 +369,31 @@ ExecStoreTuple(HeapTuple tuple,
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
         }
 */
+/*
+    pid_t pid;
+    if ((pid = getpid()) < 0) {
+          perror("Sender unable to get pid\n");
+        }
+    else {
+          printf("Sender The process id is %d\n", pid);
+        }
+*/
 
+    /*
+    //declare threas pool
+    if(thpoolGloabl1==NULL)
+        thpoolGloabl1 = thpool_init(1);
+    //prepare arguments for routine
+    struct HT_args arg;
+    arg.startAddr=((char*)tuple->t_data) - 64;//pointer in NVM
+    arg.direction=DIRECTION;
+    arg.NumberOfBytes=6*64;
+    //printf("SENT: arg.startAddr=%p arg.direction=%d arg.NumberOfBytes=%d\n",arg.startAddr,arg.direction,arg.NumberOfBytes);
+    //Pass work to threads
+    thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
+
+    */
+    //==================================================
 
 	/* Mark extracted state invalid */
 	slot->tts_nvalid = 0;

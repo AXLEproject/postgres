@@ -82,8 +82,8 @@
 //Naveed
 //========================
 //#include "HelperThread.h"
-#include "threadPool/thpool.h"
-#include "threadPool/work.h"
+//#include "threadPool/thpool.h"
+#include "work.h"
 
 //========================
 
@@ -1091,14 +1091,72 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
             }
             //Naveed
             //==============================
+
             //preparing arguments for work function
+
+
+            /*
+            int Limit=1024;//1 KB
             struct HT_args arg;
             arg.startAddr=vfdP->pm_size_list[0];
-            arg.direction=1;
-            arg.NumberOfBytes=vfdP->pm_size_list[0];
+            arg.direction=DIRECTION;
+            if((vfdP->pm_size_list[0])<=Limit)
+                arg.NumberOfBytes=(vfdP->pm_size_list[0]);
+            else
+                arg.NumberOfBytes=Limit;
+            */
 
+
+
+            //printf("SEND: vfdP->pm_size_list[0]=%d arg.NumberOfBytes=%d\n",(vfdP->pm_size_list[0]),arg.NumberOfBytes);
+            //arg.NumberOfBytes=1024;//1 KB
+            //printf("SENT: arg.startAddr=%p arg.direction=%d arg.NumberOfBytes=%d\n",arg.startAddr,arg.direction,arg.NumberOfBytes);
+/*
             //adding work to the pool
+            printf("adding work to thread pool\n");
+            thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
+            //thpool_wait(thpoolGloabl1);
+            //sleep(2);
+            */
+
+           // printf("Before thpoolGlobal1=%d\n",(int)thpoolGloabl1);
+            //printf("Making threadpool with 4 threads\n");
+
+
+
+            /*
+            if(thpoolGloabl1==NULL)
+                thpoolGloabl1 = thpool_init(10);
+            */
+
+
+
+            //printf("After thpoolGlobal1=%d\n",(int)thpoolGloabl1);
+
+/*
+            pid_t pid;
+            if ((pid = getpid()) < 0) {
+                  perror("FathNameOpenFile unable to get pid\n");
+                }
+            else {
+                  printf("FathNameOpenFile The process id is %d\n", pid);
+                }
+*/
+            //printf("Adding 1 task to threadpool\n");
+/*
+            int i;
+            for (i=0; i<20; i++){*/
+                //thpool_add_work(thpoolGloabl1, &task1, NULL);
             //thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
+                /*thpool_add_work(thpoolGloabl1, &task2, NULL);
+                };*/
+
+            /*
+            thpool_wait(thpoolGloabl1);
+            printf("Killing threadpool\n");
+            thpool_destroy(thpoolGloabl1);
+            */
+
 /*
             int err;
 
@@ -1434,6 +1492,8 @@ FilePrefetch(File file, off_t offset, int amount)
 int
 FileRead(File file, char **buffer, int amount)
 {
+
+
 	int			returnCode;
         int i;
         off_t delta;
@@ -1474,7 +1534,34 @@ retry:
         if (i == 0) delta = VfdCache[file].seekPos;
         else delta = VfdCache[file].seekPos - VfdCache[file].pm_size_list[i-1];
         Assert(delta >= 0);
+        //Naveed_Ext
+        //===============================================
+
+        //int numberOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
+          //  printf("Number of processors: %d\n", numberOfProcessors);
+
+        //declare threas pool
+        if(thpoolGloabl1==NULL)
+            thpoolGloabl1 = thpool_init(1);
+        //prepare arguments for routine
+        if((*(*buffer))!=NULL)
+        {
+            struct HT_args arg;
+            arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//copy from NVM location
+            arg.destBuffer=*(*buffer);//copy to internal buffer postgres
+            arg.direction=DIRECTION;//direction of copy operation
+            //arg.NumberOfBytes=amount;//amount to be copied
+            arg.NumberOfBytes=1024;//1 KB
+            //printf("SENT: arg.startAddr=%p arg.direction=%d arg.NumberOfBytes=%d\n",arg.startAddr,arg.direction,arg.NumberOfBytes);
+            //Pass work to threads
+            printf("Sender: PID=%d arg.srcAddr=%p  arg.destBuffer=%p arg.direction=%d arg.NumberOfBytes=%d\n",getpid(),arg.srcAddr,arg.destBuffer,arg.direction,arg.NumberOfBytes);
+            thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
+        }
+
+        //===============================================
+
         *buffer = (char*) VfdCache[file].pm_ptr_list[i] + delta;
+
 
 //        __builtin_prefetch((void*) ((char*)*buffer));
 //        __builtin_prefetch((void*) ((char*)*buffer) + 64);
