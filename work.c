@@ -5,12 +5,8 @@
 /*
 prefetchData which starts fetching "NumberOfBtes" data from memory into the cache starting from "startAddress" in "direction".
 */
-
-
 void task1(){
-    //printf("Thread #%u working on task1\n", (int)pthread_self());
-    //printf("Task count=%d\n",++TaskCount);
-
+    printf("Thread #%u working on task1\n", (int)pthread_self());
 }
 
 void task2(){
@@ -19,8 +15,6 @@ void task2(){
 
 void prefetchData(void *argRcvd)
 {    
-    char tempBuffer[8193];
-    tempBuffer[8192]=0;
 
     /*cpu_set_t cpus;
 
@@ -45,7 +39,7 @@ void prefetchData(void *argRcvd)
     struct HT_args *arg = (struct HT_args*)argRcvd;
     if(arg->direction==DIRECTION)
     {
-        //printf("RCVR: PID=%d arg.srcAddr=%p  arg.destBuffer=%p arg.direction=%d arg.NumberOfBytes=%d\n",getpid(),arg->srcAddr,arg->destBuffer,arg->direction,arg->NumberOfBytes);
+        printf("RCVR: PID=%d arg.srcAddr=%p  arg.destBuffer=%p arg.direction=%d arg.NumberOfBytes=%d\n",getpid(),arg->srcAddr,arg->destBuffer,arg->direction,arg->NumberOfBytes);
 
         /*
         //built_in prefetch  based data prefetching scheme
@@ -64,14 +58,13 @@ void prefetchData(void *argRcvd)
 
         //mmemcopy based data prefetching
 
-        char *srcAddr=arg->srcAddr;        
+        char *srcAddr=arg->srcAddr;
+        char *dstBuffer=arg->destBuffer;
         size_t amount=(size_t)(arg->NumberOfBytes);
-
         if(amount>8192)
             amount=8192;
-
         //printf("dstPtr=%p SrcPtr=%p amount=%d\n",basePtr,tempBuffer,amount);
-        memcpy(tempBuffer,srcAddr, amount);
+        memcpy(dstBuffer,srcAddr, amount);
 
 
         //Array based copy operation

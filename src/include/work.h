@@ -13,8 +13,7 @@ value of 64
 direction: 1= forward, -1=backword
 */
 struct HT_args {
-  char *srcAddr;
-  char *destBuffer;
+  char *srcAddr;  
   int NumberOfBytes;
   char direction;
 };
@@ -28,3 +27,5 @@ threadpool thpoolGloabl1;
 void task1();
 
 void task2();
+
+int ret1;

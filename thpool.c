@@ -49,9 +49,6 @@ typedef struct job{
 	void*  arg;                          /* function's argument       */
 } job;
 
-//job* GlobalJob=(struct job*)malloc(sizeof(struct job));
-job GlobalJobArray[100];
-unsigned int jobCount=0;
 
 /* Job queue */
 typedef struct jobqueue{
@@ -171,33 +168,23 @@ struct thpool_* thpool_init(int num_threads){
 /* Add work to the thread pool */
 int thpool_add_work(thpool_* thpool_p, void *(*function_p)(void*), void* arg_p){
 //	printf("In thpool_add_work\n");
-
 	job* newjob;
 
 	newjob=(struct job*)malloc(sizeof(struct job));
 	if (newjob==NULL){
 		fprintf(stderr, "thpool_add_work(): Could not allocate memory for new job\n");
 		return -1;
-    }
+	}
 
-    //add function and argument
+	/* add function and argument */
 	newjob->function=function_p;
-    newjob->arg=arg_p;
+	newjob->arg=arg_p;
 
-    //add job to queue
-    //Naveed Commented
-    pthread_mutex_lock(&thpool_p->jobqueue_p->rwmutex);
-    jobqueue_push(thpool_p, newjob);
-    //Naveed Commented
-    pthread_mutex_unlock(&thpool_p->jobqueue_p->rwmutex);
-/*
+	/* add job to queue */
+	pthread_mutex_lock(&thpool_p->jobqueue_p->rwmutex);
+	jobqueue_push(thpool_p, newjob);
+	pthread_mutex_unlock(&thpool_p->jobqueue_p->rwmutex);
 
-    GlobalJobArray[jobCount].function=function_p;
-    GlobalJobArray[jobCount].arg=arg_p;
-    jobCount=jobCount%100;
-    jobqueue_push(thpool_p, &GlobalJobArray[jobCount]);
-
-*/
 	return 0;
 }
 
@@ -294,7 +281,7 @@ static int thread_init (thpool_* thpool_p, struct thread** thread_p, int id){
     //Naveed
     //===============================================
 
-
+/*
     pthread_attr_t attr;
     cpu_set_t cpus;    
 
@@ -306,10 +293,10 @@ static int thread_init (thpool_* thpool_p, struct thread** thread_p, int id){
 
     pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
     pthread_create(&(*thread_p)->pthread, &attr, (void *)thread_do, (*thread_p));
-
+*/
     //===============================================
 
-    //pthread_create(&(*thread_p)->pthread, NULL, (void *)thread_do, (*thread_p));
+    pthread_create(&(*thread_p)->pthread, NULL, (void *)thread_do, (*thread_p));
 	pthread_detach((*thread_p)->pthread);
 	return 0;
 }
@@ -333,15 +320,6 @@ static void thread_hold () {
 * @return nothing
 */
 static void* thread_do(struct thread* thread_p){
-    //Naveed
-    //get scheduling policy of helper thread here
-    /*
-    struct sched_param param;
-    param.__sched_priority=0;
-    sched_setscheduler(getpid(), SCHED_IDLE,&param);
-    //printf("Scheduling policy of helper thread is=%d\n",sched_getscheduler(getpid()));
-    */
-
 
 	/* Set thread name for profiling and debuging */
 	char thread_name[128] = {0};
@@ -368,49 +346,41 @@ static void* thread_do(struct thread* thread_p){
 		fprintf(stderr, "thread_do(): cannot handle SIGUSR1");
 	}
 	
-    /* Mark thread as alive (initialized) */
+	/* Mark thread as alive (initialized) */
 	pthread_mutex_lock(&thpool_p->thcount_lock);
 	thpool_p->num_threads_alive += 1;
 	pthread_mutex_unlock(&thpool_p->thcount_lock);
 
 	while(threads_keepalive){
 
-        bsem_wait(thpool_p->jobqueue_p->has_jobs);
+		bsem_wait(thpool_p->jobqueue_p->has_jobs);
 
 		if (threads_keepalive){
-            //Naveed Commented
-            pthread_mutex_lock(&thpool_p->thcount_lock);
-            //Naveed Commented
-            thpool_p->num_threads_working++;
-            //Naveed Commented
-            pthread_mutex_unlock(&thpool_p->thcount_lock);
-
+			
+			pthread_mutex_lock(&thpool_p->thcount_lock);
+			thpool_p->num_threads_working++;
+			pthread_mutex_unlock(&thpool_p->thcount_lock);
+			
 			/* Read job from queue and execute it */
 			void*(*func_buff)(void* arg);
 			void*  arg_buff;
 			job* job_p;
-            //Naveed Commented
-            pthread_mutex_lock(&thpool_p->jobqueue_p->rwmutex);
+			pthread_mutex_lock(&thpool_p->jobqueue_p->rwmutex);
 			job_p = jobqueue_pull(thpool_p);
-            //Naveed Commented
-            pthread_mutex_unlock(&thpool_p->jobqueue_p->rwmutex);
+			pthread_mutex_unlock(&thpool_p->jobqueue_p->rwmutex);
 			if (job_p) {
 				func_buff = job_p->function;
 				arg_buff  = job_p->arg;
-                func_buff(arg_buff);
-                free(job_p);
+				func_buff(arg_buff);
+				free(job_p);
 			}
-            //Naveed Commented
-            pthread_mutex_lock(&thpool_p->thcount_lock);
-            //Naveed Commented
-            thpool_p->num_threads_working--;
-            //Naveed Commented
-
-            if (!thpool_p->num_threads_working) {
-                pthread_cond_signal(&thpool_p->threads_all_idle);
-            }
-            pthread_mutex_unlock(&thpool_p->thcount_lock);
-
+			
+			pthread_mutex_lock(&thpool_p->thcount_lock);
+			thpool_p->num_threads_working--;
+			if (!thpool_p->num_threads_working) {
+				pthread_cond_signal(&thpool_p->threads_all_idle);
+			}
+			pthread_mutex_unlock(&thpool_p->thcount_lock);
 
 		}
 	}
