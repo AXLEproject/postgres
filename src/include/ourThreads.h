@@ -4,6 +4,12 @@
 #define jobQueueSize 100
 #define DIRECTION 1
 #define BufferSize 128*1024
+//#define BufferSize 32769
+//#define BlockSize 8192 //8KB
+//#define BlockSize 1024//1KB
+#define BlockSize 16384 //16KB
+//#define BlockSize 32768 //32KB
+
 
 //#define BufferSize 8193
 //#define DELTA 3
@@ -14,6 +20,11 @@ pthread_mutex_t fetch_mutex;
 pthread_cond_t fetch_cv;
 int push_Index,pull_Index;
 int remJobs;
+
+
+char *prevFetchStartAdr;
+char *prevFetchEndAdr;
+off_t remFileSize;
 //int push_count,pull_count,Delta;
 //int actPushIndex,actPullIndex;
 //int jobQIndex;
@@ -22,6 +33,9 @@ int remJobs;
 /*
 Struct to pass arguments to the prefetchData function
 startAddr: Addres to fetch data from
+fileMapSize: Size of the mapping of the file to which the block belongs
+delta: current offset in the file mapping where block is located
+So, remSizeOfFile=fileMapSize-Delta;
 NumberOfBytes: Number of bytes to be fetched, this argument must be multiple of 64 with smallest possible
 value of 64
 direction: 1= forward, -1=backword
@@ -29,6 +43,7 @@ direction: 1= forward, -1=backword
 
 typedef struct prefetch_args {
   char *srcAddr;
+  off_t fileMapSize, Delta;
   int NumberOfBytes;
   char direction;
 }prefetch_args;

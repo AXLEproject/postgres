@@ -1539,14 +1539,14 @@ retry:
         //Naveed_Ext
         //===============================================
         /*
-        printf("VfdCache[%d].fileName=%s VfdCache[%d].fileSize=%ld VfdCache[%d].pm_ptr_list[%d]=%p VfdCache[%d].pm_size_list[%d]=%ld currentAddr=%p\n ",
+        printf("VfdCache[%d].fileName=%s VfdCache[%d].fileSize=%ld VfdCache[%d].pm_ptr_list[%d]=%p VfdCache[%d].pm_size_list[%d]=%ld delta=%ld currentAddr=%p\n ",
                file,VfdCache[file].fileName,
                file, (long long)(VfdCache[file].fileSize),
                file,i,VfdCache[file].pm_ptr_list[i],
                file,i,(long long)(VfdCache[file].pm_size_list[i]),
+               delta,
                (char*) VfdCache[file].pm_ptr_list[i] + delta);
 */
-
         //initilize thread (if already not initialized)
         if(gloablThrdeadID==NULL)
             {
@@ -1565,6 +1565,9 @@ retry:
             */
             remJobs=0;
 
+            prevFetchStartAdr=NULL;
+            prevFetchEndAdr=NULL;
+
 
             //jobQIndex=-1;
             }
@@ -1574,8 +1577,11 @@ retry:
 
         prefetch_args arg;
         arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//copy from NVM location
+        arg.fileMapSize=VfdCache[file].pm_size_list[i];
+        arg.Delta=delta;
         arg.direction=DIRECTION;//direction of copy operation
         arg.NumberOfBytes=amount;
+        //arg.NumberOfBytes=(VfdCache[file].pm_size_list[i])-delta;
 
         jobUnit job;
         job.arg=&arg;

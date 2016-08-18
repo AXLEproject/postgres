@@ -140,17 +140,51 @@ void prefetch_Data(void *argRcvd)
 
 
     //******************************************************************************
-
+    //mmemcopy based data prefetching
     //printf("helper thread: pull_Index=%d\n",pull_Index);
     //printf("helper thread:%d pull_Index=%d prefetching data\n",getpid(),pull_Index);
-
-
-
-
-
     //printf("helper thread: prefetching data\n");
+
     char tempBuffer[BufferSize];
     tempBuffer[BufferSize-1]=0;
+
+
+    /*
+    if(arg->direction==DIRECTION)
+    {
+        //printf("A\n");
+        remFileSize=(arg->fileMapSize)-(arg->Delta);
+        //printf("B\n");
+        if(remFileSize>BlockSize)
+        {
+            //printf("C\n");
+            remFileSize=BlockSize;
+        }
+        size_t amount=(size_t)remFileSize;
+        //printf("remFileSize=%ld\n",(long long)remFileSize);
+        //printf("prevFetchStartAdr=%p prevFetchEndAdr=%p arg->srcAddr=%p amount=%d\n",prevFetchStartAdr,prevFetchEndAdr,arg->srcAddr,amount);
+        if(((prevFetchStartAdr==NULL)&&(prevFetchEndAdr==NULL))//first ever fetch request
+                ||((arg->srcAddr)>prevFetchEndAdr))//OR no overlapping at all with previous prefetched block
+        {
+            //printf("In if block\n");
+            prevFetchStartAdr=arg->srcAddr;
+            prevFetchEndAdr=prevFetchStartAdr+remFileSize-1;
+            //printf("tempBuffer=%p arg->srcAddr=%p prevFetchStartAdr=%p amount=%d\n",tempBuffer,arg->srcAddr, prevFetchStartAdr,amount);
+            memcpy(tempBuffer,prevFetchStartAdr,amount);
+        }
+        else//overlapping with previous prefetched block
+        {
+        //do nothing
+            //printf("in Else block\n");
+        }
+
+
+    }
+
+*/
+
+
+
 
 
     //if((arg->direction==DIRECTION)&&((arg->srcAddr)!=NULL))
@@ -160,16 +194,30 @@ void prefetch_Data(void *argRcvd)
         //printf("helper thread:%d srcAddr=%p direction=%d NumberOfBytes=%d\n",getpid(),arg->srcAddr,arg->direction,arg->NumberOfBytes);
 
         size_t amount=(size_t)(arg->NumberOfBytes);
+        //size_t amount=(size_t)((arg->fileMapSize)-(arg->Delta));
+
         //char *srcAddr=(arg->srcAddr)+8192;
         char *srcAddr=(arg->srcAddr);
 
+        /*
         if(amount>8192)
+        {
+            //printf("arg->fileMapSize=%ld arg->Delta=%ld amount=%d\n",(long long)(arg->fileMapSize),(long long)(arg->Delta),amount);
             amount=8192;
+        }
+*/
 
-        //printf("helper thread:%d tempBuffer=%p srcAddr=%p amount=%d\n",getpid(),tempBuffer,srcAddr,amount);
+        if(amount>32768)
+            amount=32768;
+
+        if(amount>8192)
+            printf("helper thread: amount=%d\n",amount);
+
+
         memcpy(tempBuffer,srcAddr, amount);
 
     }
+
 
 }
 
