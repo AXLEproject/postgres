@@ -79,9 +79,44 @@ void prefetch_Data(void *argRcvd)
             amount=BlockSize;
             }
 
-        prevFetchStartAdr=arg->srcAddr;
-        memcpy(tempBuffer,prevFetchStartAdr,amount);
+        if(
+                ((arg->srcAddr)>(prevFetchStartAdr))
+                &&
+                ((arg->srcAddr)<=(prevFetchEndAdr))
+          )
+            {
+
+            //=================================================================
+
+            //Algo3
+            amount=amount -(prevFetchEndAdr-(arg->srcAddr))-1;
+            prevFetchStartAdr=prevFetchEndAdr+1;
+            prevFetchEndAdr=prevFetchStartAdr+amount-1;
+            memcpy(tempBuffer,prevFetchStartAdr,amount);
+            //=================================================================
+            /*
+            //Algo4
+            //amount=amount -(prevFetchEndAdr-(arg->srcAddr))-1;
+            if(remFileSize>(2*amount))
+                {
+                prevFetchStartAdr=prevFetchEndAdr+1;
+                prevFetchEndAdr=prevFetchStartAdr+amount-1;
+                memcpy(tempBuffer,prevFetchStartAdr,amount);
+                }
+            */
+            }
+        else
+            {
+            prevFetchStartAdr=arg->srcAddr;
+            prevFetchEndAdr=prevFetchStartAdr+amount-1;
+            memcpy(tempBuffer,prevFetchStartAdr,amount);
+
+            }
         }
+
+
+
+
 }
 
 void task1_our()
