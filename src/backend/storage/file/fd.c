@@ -1538,119 +1538,41 @@ retry:
 
         //Naveed_Ext
         //===============================================
-        /*
-        printf("VfdCache[%d].fileName=%s VfdCache[%d].fileSize=%ld VfdCache[%d].pm_ptr_list[%d]=%p VfdCache[%d].pm_size_list[%d]=%ld delta=%ld currentAddr=%p\n ",
-               file,VfdCache[file].fileName,
-               file, (long long)(VfdCache[file].fileSize),
-               file,i,VfdCache[file].pm_ptr_list[i],
-               file,i,(long long)(VfdCache[file].pm_size_list[i]),
-               delta,
-               (char*) VfdCache[file].pm_ptr_list[i] + delta);
-*/
         //initilize thread (if already not initialized)
         if(gloablThrdeadID==NULL)
             {
+            //initialize mutex and cond var
             pthread_mutex_init(&fetch_mutex, NULL);
             pthread_cond_init (&fetch_cv, NULL);
-
-            //printf("Intializing the thread\n");
+            //create thread
             initThread(&gloablThrdeadID);
-            //bsem_init_our(&globalSem,0);
+            //initailize all other variables
             push_Index=-1;
-            pull_Index=-1;
-            /*
-            push_count=0;
-            pull_count=0;
-            Delta=DELTA;
-            */
+            pull_Index=-1;            
             remJobs=0;
-
             prevFetchStartAdr=NULL;
             prevFetchEndAdr=NULL;
-
-
-            //jobQIndex=-1;
+            //setting last element of tempBuffer to NULL to avoid segmentation fault
+            tempBuffer[BufferSize-1]=0;
             }
 
 
         //assign work to thread
+        //prepare argument
+        arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
+        arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-        prefetch_args arg;
-        arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//copy from NVM location
-        arg.fileMapSize=VfdCache[file].pm_size_list[i];
-        arg.Delta=delta;
-        arg.direction=DIRECTION;//direction of copy operation
-        arg.NumberOfBytes=amount;
-        //arg.NumberOfBytes=(VfdCache[file].pm_size_list[i])-delta;
-
-        jobUnit job;
+        //prepare job
         job.arg=&arg;
-        job.argPlaced=1;
-        //job.fetchedFlag=0;
-        //job.function=(void*)prefetch_Data;
+        job.argPlaced=1;//indicates that a valid arg is placed
 
 
-        //pthread_mutex_lock(&arrayLock);
-        pthread_mutex_lock(&fetch_mutex);
-        //jobQIndex=(++jobQIndex)%jobQueueSize;
-        push_Index=(++push_Index)%jobQueueSize;
-        ++remJobs;
-
-        /*
-        if(push_Index==jobQueueSize-1)
-            ++push_count;
-        actPushIndex=push_count*jobQueueSize+push_Index;
-        */
-
-
-        //printf("main thread: jobQIndex=%d srcAddr=%p direction=%d NumberOfBytes=%d\n",jobQIndex, arg.srcAddr, arg.direction, arg.NumberOfBytes);
-        //jobArray[jobQIndex]=job;
-        jobArray[push_Index]=job;
-
-
-        //printf("main thread: push_Index=%d\n",push_Index);
-        //printf("main thread:%d jobArray[%d].argPlaced=%d srcAddr=%p direction=%d NumberOfBytes=%d\n",getpid(), push_Index,jobArray[push_Index].argPlaced ,arg.srcAddr, arg.direction, arg.NumberOfBytes);
-
-
-
-        //pthread_mutex_unlock(&arrayLock);
-        //proceed=1;
-        //++indexDist;
-        //if(indexDist==5)
-            pthread_cond_signal(&fetch_cv);
-        pthread_mutex_unlock(&fetch_mutex);
-
-
-        //get scheduling policy of main thread here
-        //printf("Scheduling policy of main thread is=%d\n",sched_getscheduler(getpid()));
-
-        //int numberOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
-          //  printf("Number of processors: %d\n", numberOfProcessors);
-
-        //declare threas pool
-        //Step1
-/*
-        if(thpoolGloabl1==NULL)
-            thpoolGloabl1 = thpool_init(1);
-
-        //Step2
-        thpool_add_work(thpoolGloabl1, (void*)task1, NULL);
-*/
-        //prepare arguments for routine
-    /*
-        struct HT_args arg;
-        arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//copy from NVM location
-        arg.direction=DIRECTION;//direction of copy operation
-        arg.NumberOfBytes=amount;
-        //printf("Sender: PID=%d arg.srcAddr=%p  arg.destBuffer=%p arg.direction=%d arg.NumberOfBytes=%d\n",getpid(),arg.srcAddr,arg.destBuffer,arg.direction,arg.NumberOfBytes);
-        thpool_add_work(thpoolGloabl1, (void*)prefetchData, &arg);
-      */
-        /*
-        if(gloablThrdID==NULL)
-            {
-            initThread(gloablThrdID);
-            }
-*/
+        pthread_mutex_lock(&fetch_mutex);           //lock mutex
+        push_Index=(++push_Index)%jobQueueSize;      //increment queue push index
+        ++remJobs;                                  //increment number of jobs waiting to served
+        jobArray[push_Index]=job;                   //place job in job Queue
+        pthread_cond_signal(&fetch_cv);             //signal the cond var
+        pthread_mutex_unlock(&fetch_mutex);         //unlock mutex
 
 
         //===============================================

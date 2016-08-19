@@ -1,84 +1,96 @@
 #include <pthread.h>
 #include<stdio.h>
 
+//Size of Queue holding jobs
 #define jobQueueSize 100
-#define DIRECTION 1
+//Size of temporary buffer, which is used as destination for memcopy operation in helper thread
 #define BufferSize 128*1024
-//#define BufferSize 32769
+
+//************************************************************
+//Block sizes for prefetching data from NVM
+
 //#define BlockSize 8192 //8KB
-//#define BlockSize 1024//1KB
-#define BlockSize 16384 //16KB
+//#define BlockSize 12288 //12 KB
+#define BlockSize 16384 //16KB Until now, 16KB block size gives best results in term of execution time
+//#define BlockSize 20480//20 KB
+//#define BlockSize 24576//24 KB
 //#define BlockSize 32768 //32KB
+//#define BlockSize 65536 //64KB
 
-
-//#define BufferSize 8193
-//#define DELTA 3
-
-pthread_t gloablThrdeadID;
-//pthread_mutex_t arrayLock;
-pthread_mutex_t fetch_mutex;
-pthread_cond_t fetch_cv;
-int push_Index,pull_Index;
-int remJobs;
-
-
-char *prevFetchStartAdr;
-char *prevFetchEndAdr;
-off_t remFileSize;
-//int push_count,pull_count,Delta;
-//int actPushIndex,actPullIndex;
-//int jobQIndex;
-
-
-/*
-Struct to pass arguments to the prefetchData function
-startAddr: Addres to fetch data from
-fileMapSize: Size of the mapping of the file to which the block belongs
-delta: current offset in the file mapping where block is located
-So, remSizeOfFile=fileMapSize-Delta;
-NumberOfBytes: Number of bytes to be fetched, this argument must be multiple of 64 with smallest possible
-value of 64
-direction: 1= forward, -1=backword
+//*************************************************************
+/*Struct which is used to pass arguments to the prefetchData function
+ * startAddr: Addres to fetch data from BlkSize: This item is not
+ * named in the proper way. Actually it is used to pass the remaing
+ * (unfetched) size of file to prefetch_Data()
 */
 
 typedef struct prefetch_args {
   char *srcAddr;
-  off_t fileMapSize, Delta;
-  int NumberOfBytes;
-  char direction;
+  off_t BlkSize;
 }prefetch_args;
 
 
-/* Job */
+/* Job:
+ * A struct which is used to represent the job to be perfomed by the prefetch_Data()
+ * Each elemnt of job Queue holds an item of this type "job"
+ * arg: a pointer variable used to hold the arguments to the prefetch_Data()
+ * argPlaced: used to check if "arg" is place in job Queue. 1: valid value in queue element, 0: invalid value.
+*/
 typedef struct jobUnit{
-    //void*  (*function)(void* arg);       /* function pointer          */
     void*  arg;                          /* function's argument       */
     unsigned char argPlaced;
 } jobUnit;
 
-
-/* Binary semaphore */
+//**************************************************************
+//a global thread ID used to create our ONLY thread
+pthread_t gloablThrdeadID;
 /*
-typedef struct bsem_our {
-    pthread_mutex_t mutex;
-    pthread_cond_t   cond;
-    int v;
-} bsem_our;
-
-bsem_our globalSem;
+ * fetch_mutex along with fetch_cv is used for controling r/w access
+ * to job Queue which is accessed by both Postgres and helper thread.
 */
-jobUnit jobArray[jobQueueSize];
+pthread_mutex_t fetch_mutex;
+pthread_cond_t fetch_cv;
+/*
+ * push_Index: used by postgres to insert jobs in the job queue.
+ * pull_Index: used by helper thread for extracting jobs from job queue.
+ * remJobs: indicates the jobs waiting queue to be serviced by helper thread at any given time
+ */
+int push_Index,pull_Index;
+int remJobs;
 
+/*
+ * prevFetchStartAdr: shows the address from where helper threads start prefetching.
+ * prevFetchEndAdr: it is not used yet.
+ */
+char *prevFetchStartAdr;
+char *prevFetchEndAdr;
+/* Following variables are accessed only by helper thread.
+ * tempBuffer: is the temporary buffer for prefetching data
+ * remFileSize: indicates the remaining file size (which is not yet prefetched)
+ * amount: amount of data to be copied in memcopy operation of helper thread
+ */
+char tempBuffer[BufferSize];
+off_t remFileSize;
+size_t amount;
+/*
+ * jobArray: holds job.
+ * job: global variable used in fd.c
+ * arg: gloabl variable used in fd.c
+ */
+
+jobUnit jobArray[jobQueueSize];
+jobUnit job;
+prefetch_args arg;
+
+//******************************************************************
+//initializ thread: This is called only once in fd.c by FileRead()
 void initThread(pthread_t *thrdIdPtr);
+//thread routine which keeps waiting until there are jobs to be serviced in the queue
 void waitLoop(void);
+//A dummy function
 void task1_our(void);
-//prefetchData which starts fetching "NumberOfBtes" data from memory into the cache starting from "startAddress" in "direction".
+//prefetchData function (called by waitLoop function whene there are jobs in the job queue)
+//It starts fetching data block from memory into the cache starting from a given address
 void prefetch_Data(void *argRcvd);
 
-/*
-static void  bsem_init_our(struct bsem_our *bsem_p, int value);
-static void  bsem_reset_our(struct bsem_our *bsem_p);
-static void  bsem_post_our(struct bsem_our *bsem_p);
-static void  bsem_post_all_our(struct bsem_our *bsem_p);
-static void  bsem_wait_our(struct bsem_our *bsem_p);
-*/
+
