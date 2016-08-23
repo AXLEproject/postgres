@@ -7,20 +7,26 @@ void waitLoop()
     /* Read job from queue and execute it */
     while(1)
     {
-        pthread_mutex_lock(&fetch_mutex);//lock mutex
-        //while (remJobs == 0)
-        while (remJobs <= 5000)
-            {
-            pthread_cond_wait(&fetch_cv, &fetch_mutex);//wait on cond var
-            }
-        remJobs--;
-        pthread_mutex_unlock(&fetch_mutex);//unlock mutex
 
-        prefetch_Data(jobArray[pull_Index].arg);        
-        //printf("user thread: pull_index=%d remJobs=%d\n",pull_Index,remJobs);
-        pull_Index++;
+            pthread_mutex_lock(&fetch_mutex);
+            if(remJobs>0)
+                    {
+                    localRemJobs=remJobs;
+                    remJobs=0;
+                    }
+            else
+                    {
+                    localRemJobs=0;
+                    }
+            pthread_mutex_unlock(&fetch_mutex);
 
-        pull_Index = pull_Index % jobQueueSize;
+        for(loopIndex=0;loopIndex<localRemJobs;++loopIndex)
+        {
+            prefetch_Data(jobArray[pull_Index].arg);
+            //printf("user thread: pull_index=%d remJobs=%d localRemJobs=%d\n",pull_Index,remJobs,localRemJobs);
+            pull_Index++;
+            pull_Index = pull_Index % jobQueueSize;
+        }
     }
 }
 
@@ -74,18 +80,11 @@ void prefetch_Data(void *argRcvd)
         if(amount>BlockSize)
             {
             amount=BlockSize;
-            }
-       /* if(
-           ((prevFetchStartAdr==NULL)&&(prevFetchEndAdr==NULL))//very first prefetch
-            ||
-            (((arg->srcAddr)<prevFetchStartAdr)||((arg->srcAddr)>prevFetchEndAdr))//avoid reFetch
-           )
-           */
-            {
-            prevFetchStartAdr=arg->srcAddr;
-            //prevFetchEndAdr=prevFetchStartAdr+amount-1;
-            memcpy(tempBuffer,prevFetchStartAdr,amount);
-            }
+            }    
+
+        prevFetchStartAdr=arg->srcAddr;
+        prevFetchEndAdr=prevFetchStartAdr+amount-1;
+        memcpy(tempBuffer,prevFetchStartAdr,amount);
         }
 }
 

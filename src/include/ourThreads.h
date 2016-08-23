@@ -2,7 +2,7 @@
 #include<stdio.h>
 
 //Size of Queue holding jobs
-#define jobQueueSize 10000
+#define jobQueueSize 100
 //Size of temporary buffer, which is used as destination for memcopy operation in helper thread
 #define BufferSize 128*1024
 
@@ -49,14 +49,15 @@ pthread_t gloablThrdeadID;
  * to job Queue which is accessed by both Postgres and helper thread.
 */
 pthread_mutex_t fetch_mutex;
-pthread_cond_t fetch_cv;
+
 /*
  * push_Index: used by postgres to insert jobs in the job queue.
  * pull_Index: used by helper thread for extracting jobs from job queue.
  * remJobs: indicates the jobs waiting queue to be serviced by helper thread at any given time
  */
 int push_Index,pull_Index;
-int remJobs;
+int remJobs,localRemJobs,loopIndex;
+
 
 /*
  * prevFetchStartAdr: shows the address from where helper threads start prefetching.

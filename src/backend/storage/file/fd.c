@@ -1539,10 +1539,10 @@ retry:
         //Naveed_Ext
         //===============================================
         //initilize thread (if already not initialized)
-        if(gloablThrdeadID==NULL) {
+        if(gloablThrdeadID==NULL)
+            {
             //initialize mutex and cond var
             pthread_mutex_init(&fetch_mutex, NULL);
-            pthread_cond_init (&fetch_cv, NULL);
             //create thread
             initThread(&gloablThrdeadID,3);
             //initailize all other variables
@@ -1553,30 +1553,36 @@ retry:
             prevFetchEndAdr=NULL;
             //setting last element of tempBuffer to NULL to avoid segmentation fault
             tempBuffer[BufferSize-1]=0;
-        }
+            }
 
-        //assign work to thread
-        //prepare argument
-        arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
-        arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-        // Only call helper for addresses alligned to BlockSize
-        //if ((uint64_t)arg.srcAddr % (uint64_t)BlockSize == 0)
-        {
+           // if(((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
+            {
+            //assign work to thread
+            //prepare argument
+            arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
+            arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-            //prepare job
-            job.arg=&arg;
-            job.argPlaced=1;//indicates that a valid arg is placed
+            // Only call helper for addresses alligned to BlockSize
 
-            pthread_mutex_lock(&fetch_mutex);           //lock mutex
-                jobArray[push_Index]=job;                   //place job in job Queue                
-                remJobs++;                                  //increment number of jobs waiting to served
-                //printf("main thread: push_index=%d remJobs=%d\n",push_Index,remJobs);
+
+                //prepare job
+                job.arg=&arg;
+                job.argPlaced=1;//indicates that a valid arg is placed
+
+
+                jobArray[push_Index]=job;                   //place job in job Queue
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-                pthread_cond_signal(&fetch_cv);             //signal the cond var
-            pthread_mutex_unlock(&fetch_mutex);         //unlock mutex
-        }
+
+                pthread_mutex_lock(&fetch_mutex);
+                    remJobs++;                                  //increment number of jobs waiting to served
+                    //printf("main thread: push_index=%d remJobs=%d\n",push_Index,remJobs);
+                pthread_mutex_unlock(&fetch_mutex);
+
+            }
+
+
 
         //===============================================
 

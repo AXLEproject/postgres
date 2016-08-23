@@ -358,7 +358,7 @@ ExecStoreTuple(HeapTuple tuple,
     //Naveed
     //==================================================    
 
-/*
+
         if(temp_Page!=0)
         {
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 64);
@@ -367,8 +367,9 @@ ExecStoreTuple(HeapTuple tuple,
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 256);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
+
         }
-        */
+
 
     //==================================================
 
