@@ -84,7 +84,7 @@ prefetch_args arg;
 
 //******************************************************************
 //initializ thread: This is called only once in fd.c by FileRead()
-void initThread(pthread_t *thrdIdPtr);
+void initThread(pthread_t *thrdIdPtr,unsigned char cpuNo);
 //thread routine which keeps waiting until there are jobs to be serviced in the queue
 void waitLoop(void);
 //A dummy function

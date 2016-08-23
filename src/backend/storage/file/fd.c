@@ -1544,7 +1544,7 @@ retry:
             pthread_mutex_init(&fetch_mutex, NULL);
             pthread_cond_init (&fetch_cv, NULL);
             //create thread
-            initThread(&gloablThrdeadID);
+            initThread(&gloablThrdeadID,3);
             //initailize all other variables
             push_Index=0;
             pull_Index=0;            
@@ -1561,13 +1561,16 @@ retry:
         arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
         // Only call helper for addresses alligned to BlockSize
-        if (arg.srcAddr % BlockSize == 0) {
+        //if ((uint64_t)arg.srcAddr % (uint64_t)BlockSize == 0)
+        {
+
             //prepare job
             job.arg=&arg;
             job.argPlaced=1;//indicates that a valid arg is placed
 
             pthread_mutex_lock(&fetch_mutex);           //lock mutex
                 jobArray[push_Index]=job;                   //place job in job Queue
+                //printf("main thread: push_index=%d\n",push_Index);
                 remJobs++;                                  //increment number of jobs waiting to served
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index

@@ -368,7 +368,8 @@ ExecStoreTuple(HeapTuple tuple,
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 320);
             __builtin_prefetch((void*) ((char*)tuple->t_data) - 384);
         }
-*/
+        */
+
     //==================================================
 
 	/* Mark extracted state invalid */
