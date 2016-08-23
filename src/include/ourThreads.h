@@ -2,7 +2,7 @@
 #include<stdio.h>
 
 //Size of Queue holding jobs
-#define jobQueueSize 100
+#define jobQueueSize 10000
 //Size of temporary buffer, which is used as destination for memcopy operation in helper thread
 #define BufferSize 128*1024
 

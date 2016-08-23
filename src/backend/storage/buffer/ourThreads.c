@@ -8,7 +8,8 @@ void waitLoop()
     while(1)
     {
         pthread_mutex_lock(&fetch_mutex);//lock mutex
-        while (remJobs == 0)
+        //while (remJobs == 0)
+        while (remJobs <= 5000)
             {
             pthread_cond_wait(&fetch_cv, &fetch_mutex);//wait on cond var
             }
@@ -16,7 +17,7 @@ void waitLoop()
         pthread_mutex_unlock(&fetch_mutex);//unlock mutex
 
         prefetch_Data(jobArray[pull_Index].arg);        
-        //printf("user thread: pull_index=%d\n",pull_Index);
+        //printf("user thread: pull_index=%d remJobs=%d\n",pull_Index,remJobs);
         pull_Index++;
 
         pull_Index = pull_Index % jobQueueSize;

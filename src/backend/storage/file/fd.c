@@ -1569,9 +1569,9 @@ retry:
             job.argPlaced=1;//indicates that a valid arg is placed
 
             pthread_mutex_lock(&fetch_mutex);           //lock mutex
-                jobArray[push_Index]=job;                   //place job in job Queue
-                //printf("main thread: push_index=%d\n",push_Index);
+                jobArray[push_Index]=job;                   //place job in job Queue                
                 remJobs++;                                  //increment number of jobs waiting to served
+                //printf("main thread: push_index=%d remJobs=%d\n",push_Index,remJobs);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
                 pthread_cond_signal(&fetch_cv);             //signal the cond var
