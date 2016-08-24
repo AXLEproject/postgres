@@ -1553,6 +1553,9 @@ retry:
             prevFetchEndAdr=NULL;
             //setting last element of tempBuffer to NULL to avoid segmentation fault
             tempBuffer[BufferSize-1]=0;
+
+            job.argPlaced=0;
+            job.arg=NULL;
             }
 
 
@@ -1574,12 +1577,6 @@ retry:
                 jobArray[push_Index]=job;                   //place job in job Queue
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-
-                pthread_mutex_lock(&fetch_mutex);
-                    remJobs++;                                  //increment number of jobs waiting to served
-                    //printf("main thread: push_index=%d remJobs=%d\n",push_Index,remJobs);
-                pthread_mutex_unlock(&fetch_mutex);
-
             }
 
 

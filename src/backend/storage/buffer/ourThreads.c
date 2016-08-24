@@ -8,22 +8,9 @@ void waitLoop()
     while(1)
     {
 
-            pthread_mutex_lock(&fetch_mutex);
-            if(remJobs>0)
-                    {
-                    localRemJobs=remJobs;
-                    remJobs=0;
-                    }
-            else
-                    {
-                    localRemJobs=0;
-                    }
-            pthread_mutex_unlock(&fetch_mutex);
-
-        for(loopIndex=0;loopIndex<localRemJobs;++loopIndex)
+         if(__sync_bool_compare_and_swap (&(jobArray[pull_Index].argPlaced),1,0))
         {
             prefetch_Data(jobArray[pull_Index].arg);
-            //printf("user thread: pull_index=%d remJobs=%d localRemJobs=%d\n",pull_Index,remJobs,localRemJobs);
             pull_Index++;
             pull_Index = pull_Index % jobQueueSize;
         }
@@ -54,7 +41,7 @@ void initThread(pthread_t *thrdIdPtr, unsigned char cpuNo)
     pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
     //create thread and launch for execution. The thread will invoke waitloop routine
     pthread_create(thrdIdPtr, &attr , (void *)waitLoop, NULL);
-    /*pthread_detach(*thrdIdPtr);*/
+    pthread_detach(*thrdIdPtr);
 
 }
 

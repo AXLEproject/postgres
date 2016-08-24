@@ -38,7 +38,7 @@ typedef struct prefetch_args {
 */
 typedef struct jobUnit{
     void*  arg;                          /* function's argument       */
-    unsigned char argPlaced;
+    unsigned int argPlaced;
 } jobUnit;
 
 //**************************************************************
