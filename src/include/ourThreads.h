@@ -1,9 +1,9 @@
 #include <pthread.h>
 #include<stdio.h>
 
-
 //Size of Queue holding jobs
-#define jobQueueSize 100
+//#define jobQueueSize 100
+#define jobQueueSize 4
 //Size of temporary buffer, which is used as destination for memcopy operation in helper thread
 #define BufferSize 128*1024
 
@@ -49,7 +49,7 @@ pthread_t gloablThrdeadID;
  * fetch_mutex along with fetch_cv is used for controling r/w access
  * to job Queue which is accessed by both Postgres and helper thread.
 */
-pthread_mutex_t fetch_mutex;
+//pthread_mutex_t fetch_mutex;
 
 /*
  * push_Index: used by postgres to insert jobs in the job queue.
@@ -58,7 +58,6 @@ pthread_mutex_t fetch_mutex;
  */
 int push_Index,pull_Index;
 int remJobs,localRemJobs,loopIndex;
-
 
 
 /*

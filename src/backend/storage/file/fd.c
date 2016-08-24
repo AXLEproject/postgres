@@ -1542,9 +1542,9 @@ retry:
         if(gloablThrdeadID==NULL)
             {
             //initialize mutex and cond var
-            pthread_mutex_init(&fetch_mutex, NULL);
+            //pthread_mutex_init(&fetch_mutex, NULL);
             //create thread
-            initThread(&gloablThrdeadID,3);
+            //initThread(&gloablThrdeadID,3);
             //initailize all other variables
             push_Index=0;
             pull_Index=0;            
@@ -1556,14 +1556,8 @@ retry:
 
             job.argPlaced=0;
             job.arg=NULL;
-
-            for (loopIndex=0;loopIndex<jobQueueSize;++loopIndex)
-                {
-                jobArray[loopIndex].arg=NULL;
-                jobArray[loopIndex].argPlaced=0;
-                }
-
             }
+
 
            // if(((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
             {
@@ -1579,18 +1573,20 @@ retry:
                 job.arg=&arg;
                 job.argPlaced=1;//indicates that a valid arg is placed
 
-            //use CAS instruction here instead of in waitLoop
-                 if(__sync_bool_compare_and_swap (&(jobArray[push_Index].arg),NULL,&arg))
-                 {
-                 __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
+
+                jobArray[push_Index]=job;                   //place job in job Queue
+                //printf("main thread: push_index=%d\n",push_Index);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-                 }
-
-
             }
 
-
+        if(gloablThrdeadID==NULL)
+            {
+            //initialize mutex and cond var
+            //pthread_mutex_init(&fetch_mutex, NULL);
+            //create thread
+            initThread(&gloablThrdeadID,3);
+            }
 
         //===============================================
 
