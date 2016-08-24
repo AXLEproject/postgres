@@ -1556,8 +1556,14 @@ retry:
 
             job.argPlaced=0;
             job.arg=NULL;
-            }
 
+            for (loopIndex=0;loopIndex<jobQueueSize;++loopIndex)
+                {
+                jobArray[loopIndex].arg=NULL;
+                jobArray[loopIndex].argPlaced=0;
+                }
+
+            }
 
            // if(((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
             {
@@ -1573,10 +1579,15 @@ retry:
                 job.arg=&arg;
                 job.argPlaced=1;//indicates that a valid arg is placed
 
-
-                jobArray[push_Index]=job;                   //place job in job Queue
+            //use CAS instruction here instead of in waitLoop
+                 if(__sync_bool_compare_and_swap (&(jobArray[push_Index].arg),NULL,&arg))
+                 {
+                 __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
+                 }
+
+
             }
 
 

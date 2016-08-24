@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include<stdio.h>
 
+
 //Size of Queue holding jobs
 #define jobQueueSize 100
 //Size of temporary buffer, which is used as destination for memcopy operation in helper thread
@@ -57,6 +58,7 @@ pthread_mutex_t fetch_mutex;
  */
 int push_Index,pull_Index;
 int remJobs,localRemJobs,loopIndex;
+
 
 
 /*

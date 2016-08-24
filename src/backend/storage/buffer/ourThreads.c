@@ -8,9 +8,10 @@ void waitLoop()
     while(1)
     {
 
-         if(__sync_bool_compare_and_swap (&(jobArray[pull_Index].argPlaced),1,0))
+        if(__sync_bool_compare_and_swap (&(jobArray[pull_Index].argPlaced),1,0))
         {
             prefetch_Data(jobArray[pull_Index].arg);
+            jobArray[pull_Index].arg=NULL;
             pull_Index++;
             pull_Index = pull_Index % jobQueueSize;
         }
