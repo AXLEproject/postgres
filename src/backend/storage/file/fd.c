@@ -1542,9 +1542,9 @@ retry:
         if(gloablThrdeadID==NULL)
             {
             //initialize mutex and cond var
-            //pthread_mutex_init(&fetch_mutex, NULL);
+            pthread_mutex_init(&fetch_mutex, NULL);
             //create thread
-            //initThread(&gloablThrdeadID,3);
+            initThread(&gloablThrdeadID,3);
             //initailize all other variables
             push_Index=0;
             pull_Index=0;            
@@ -1556,6 +1556,12 @@ retry:
 
             job.argPlaced=0;
             job.arg=NULL;
+
+            for(loopIndex=0;loopIndex<jobQueueSize;++loopIndex)
+                {
+                jobArray[loopIndex].argPlaced=0;
+                }
+
             }
 
 
@@ -1566,27 +1572,17 @@ retry:
             arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
             arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-            // Only call helper for addresses alligned to BlockSize
+            // Only call helper for addresses alligned to BlockSize                
 
 
-                //prepare job
-                job.arg=&arg;
-                job.argPlaced=1;//indicates that a valid arg is placed
-
-
-                jobArray[push_Index]=job;                   //place job in job Queue
-                //printf("main thread: push_index=%d\n",push_Index);
+                jobArray[push_Index].arg=&arg;                   //place job in job Queue
+                //__sync_synchronize();
+                __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
             }
 
-        if(gloablThrdeadID==NULL)
-            {
-            //initialize mutex and cond var
-            //pthread_mutex_init(&fetch_mutex, NULL);
-            //create thread
-            initThread(&gloablThrdeadID,3);
-            }
+
 
         //===============================================
 

@@ -8,23 +8,12 @@ void waitLoop()
     while(1)
     {
 
-        // if(__sync_bool_compare_and_swap (&(jobArray[pull_Index].argPlaced),1,0))
-        //printf("user thread: before if, pull_index=%d argPlaced=%d\n",(pull_Index+1) % jobQueueSize,(jobArray[(pull_Index+1) % jobQueueSize].argPlaced));
-        if((jobArray[pull_Index].argPlaced)==1)
-        {            
-            jobArray[pull_Index].argPlaced=0;
+         if(__sync_bool_compare_and_swap (&(jobArray[pull_Index].argPlaced),1,0))
+        {
             prefetch_Data(jobArray[pull_Index].arg);
-            //printf("user thread: pull_index=%d\n",pull_Index);
             pull_Index++;
             pull_Index = pull_Index % jobQueueSize;
-            //pull_Index++;
-
-        }         
-//         else
-//         {
-//             for(loopIndex=0;loopIndex<10000;++loopIndex)
-//             {}
-//         }
+        }
     }
 }
 
