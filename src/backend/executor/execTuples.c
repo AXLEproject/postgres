@@ -92,7 +92,8 @@
 #include "utils/lsyscache.h"
 #include "utils/typcache.h"
 //Naveed
-#include "work.h"
+#include "ourThreads.h"
+#include <unistd.h>
 
 
 static TupleDesc ExecTypeFromTLInternal(List *targetList,
@@ -357,6 +358,30 @@ ExecStoreTuple(HeapTuple tuple,
 
     //Naveed
     //==================================================    
+    /*
+    if((temp_Page!=0)&&(fetchCount==0))
+    {
+    //assign work to thread
+    //prepare argument
+    arg.srcAddr=(((char*)tuple->t_data)-16384);//start copying from NVM location
+    //arg.srcAddr=((char*)tuple->t_data);
+    arg.BlkSize=16384;//remaining unfected size of file mapping
+    arg.fetchType=1;
+
+    // Only call helper for addresses alligned to BlockSize
+
+
+        jobArray[push_Index].arg=&arg;                   //place job in job Queue
+        //printf("main thread: execTuple.c process id=%d push_index=%d\n",getpid(),push_Index);
+        __sync_synchronize();
+        __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
+        push_Index++;
+        push_Index = push_Index % jobQueueSize;      //increment queue push index
+    }
+    //else
+    fetchCount=(++fetchCount)%200;
+    */
+
 /*
 
         if(temp_Page!=0)
@@ -1384,3 +1409,4 @@ end_tup_output(TupOutputState *tstate)
 	ExecDropSingleTupleTableSlot(tstate->slot);
 	pfree(tstate);
 }
+
