@@ -26,8 +26,7 @@
 
 typedef struct prefetch_args {
   char *srcAddr;
-  off_t remainingFileSize;
-  unsigned int fetchType;
+  off_t BlkSize;
 }prefetch_args;
 
 
@@ -58,7 +57,6 @@ pthread_mutex_t fetch_mutex;
  */
 int push_Index,pull_Index;
 int remJobs,localRemJobs,loopIndex;
-unsigned int fetchCount;
 
 
 /*
@@ -66,8 +64,7 @@ unsigned int fetchCount;
  * prevFetchEndAdr: it is not used yet.
  */
 char *prevFetchStartAdr;
-char *prevEndAdr;
-char *prevStartAddr;
+char *prevFetchEndAdr;
 /* Following variables are accessed only by helper thread.
  * tempBuffer: is the temporary buffer for prefetching data
  * remFileSize: indicates the remaining file size (which is not yet prefetched)

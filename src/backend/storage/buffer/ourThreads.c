@@ -48,51 +48,31 @@ void initThread(pthread_t *thrdIdPtr, unsigned char cpuNo)
 void prefetch_Data(void *argRcvd)
 {
     prefetch_args *arg = (prefetch_args*)argRcvd;
-    if((arg->fetchType)==1)
-    {
-        //printf("helper thread: pull_index=%d\n",pull_Index);
-        //******************************************************************************
-        //mmemcopy based data prefetching
-        //printf("prefetching data \n");
-        //Multi-Block Prefetch
-        //Note: if BlockSize=8192, following code will act as single-block fetcher.
-        //This code can be improved since it always RE-fetch the overlapping blocks
-        //(which ahve already been read in previous jobs)
-        remFileSize=arg->remainingFileSize;
-        /*
-        A check to make sure that always a valid value of remFileSize is received,
-        Since in some queries this value turns out to be negative.
-        */
-        if(remFileSize >= BlockSize)
+    //******************************************************************************
+    //mmemcopy based data prefetching
+    //printf("prefetching data \n");
+    //Multi-Block Prefetch
+    //Note: if BlockSize=8192, following code will act as single-block fetcher.
+    //This code can be improved since it always RE-fetch the overlapping blocks
+    //(which ahve already been read in previous jobs)
+    remFileSize=arg->BlkSize;
+    /*
+    A check to make sure that always a valid value of remFileSize is received,
+    Since in some queries this value turns out to be negative.
+    */
+    if(remFileSize >= BlockSize)
         {
-            amount=(size_t)remFileSize;
-            if(amount>BlockSize)
+        amount=(size_t)remFileSize;
+        //check to make sure that we do not prefetch more than specified BlockSize
+        if(amount>BlockSize)
             {
-                amount=BlockSize;
-            }
-            prevFetchStartAdr=arg->srcAddr;
-            memcpy(tempBuffer,prevFetchStartAdr,amount);
-        }
-    }
-    else if((arg->fetchType)==2)
-    {
-        //printf("helper thread: pull_index=%d\n",pull_Index);
+            amount=BlockSize;
+            }    
+
         prevFetchStartAdr=arg->srcAddr;
-        //__builtin_prefetch(prevFetchStartAdr - 64);
-        //__builtin_prefetch(prevFetchStartAdr - 128);
-        //__builtin_prefetch(prevFetchStartAdr - 192);
-        //__builtin_prefetch(prevFetchStartAdr - 256);
-        //__builtin_prefetch(prevFetchStartAdr - 320);
-        //__builtin_prefetch(prevFetchStartAdr - 384);
-        __builtin_prefetch(prevFetchStartAdr - 448);
-        __builtin_prefetch(prevFetchStartAdr - 512);
-        __builtin_prefetch(prevFetchStartAdr - 576);
-        __builtin_prefetch(prevFetchStartAdr - 640);
-        __builtin_prefetch(prevFetchStartAdr - 704);
-        __builtin_prefetch(prevFetchStartAdr - 768);
-
-    }
-
+        prevFetchEndAdr=prevFetchStartAdr+amount-1;
+        memcpy(tempBuffer,prevFetchStartAdr,amount);
+        }
 }
 
 void task1_our()

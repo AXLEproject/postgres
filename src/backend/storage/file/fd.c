@@ -1550,15 +1550,12 @@ retry:
             pull_Index=0;            
             remJobs=0;
             prevFetchStartAdr=NULL;
-            prevEndAdr=NULL;
-            prevStartAddr=NULL;
+            prevFetchEndAdr=NULL;
             //setting last element of tempBuffer to NULL to avoid segmentation fault
             tempBuffer[BufferSize-1]=0;
 
             job.argPlaced=0;
             job.arg=NULL;
-
-            fetchCount=0;
 
             for(loopIndex=0;loopIndex<jobQueueSize;++loopIndex)
                 {
@@ -1567,95 +1564,23 @@ retry:
 
             }
 
-        /*
-        if(
-                (prevFetchEndAdr==NULL)
-                ||
-                (((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
-                )*/
-        //if(fetchCount==0)
-        //prevFetchEndAdr=prevFetchStartAdr+amount-1;
 
-       //printf("main thread: Before if, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
-
-        if(
-                ((prevEndAdr==NULL)&&((prevStartAddr==NULL)))
-                ||
-                (((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevEndAdr)
-                ||
-                (((char*) VfdCache[file].pm_ptr_list[i] + delta)<prevStartAddr)
-                )
+           // if(((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
             {
             //assign work to thread
             //prepare argument
-
-            //printf("main thread: if block before, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
             arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
-            arg.remainingFileSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
-            arg.fetchType=1;
+            arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-            if((arg.remainingFileSize)>BlockSize)
-                arg.remainingFileSize=BlockSize;
-
-            prevStartAddr=arg.srcAddr;
-            prevEndAdr=(arg.srcAddr)+(arg.remainingFileSize)-1;
-
-            //printf("main thread: if block after, startAddr=%p,prevFecthENdAddr=%p\n",prevStartAddr,prevEndAdr);
             // Only call helper for addresses alligned to BlockSize                
 
 
                 jobArray[push_Index].arg=&arg;                   //place job in job Queue
-                //printf("main thread: fd.c process id=%d push_index=%d\n",getpid(),push_Index);
-                __sync_synchronize();
+                //__sync_synchronize();
                 __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-            }/*
-        else if(((char*) VfdCache[file].pm_ptr_list[i] + delta)!=prevStartAddr)
-            {
-            //assign work to thread
-            //prepare argument
-
-            //printf("main thread: else if block before, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
-
-            arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta+8192;//start copying from NVM location
-            arg.remainingFileSize=((VfdCache[file].pm_size_list[i])-delta-8192);//remaining unfected size of file mapping
-            arg.fetchType=1;
-
-
-
-            if((arg.remainingFileSize)>BlockSize)
-                arg.remainingFileSize=BlockSize;
-
-            prevStartAddr=arg.srcAddr;
-            prevEndAdr=(arg.srcAddr)+(arg.remainingFileSize)-1;
-
-            //printf("main thread: else if block after, startAddr=%p,prevFecthENdAddr=%p\n",prevStartAddr,prevEndAdr);
-            // Only call helper for addresses alligned to BlockSize
-
-
-                jobArray[push_Index].arg=&arg;                   //place job in job Queue
-                //printf("main thread: fd.c process id=%d push_index=%d\n",getpid(),push_Index);
-                __sync_synchronize();
-                __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
-                push_Index++;
-                push_Index = push_Index % jobQueueSize;      //increment queue push index
-        }*/
-
-
-        //printf("main thread: After if, startAddr=%p,prevFecthENdAddr=%p\n",prevStartAddr,prevEndAdr);
-        /*
-        else
-        {
-            printf("main thread: else block, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
-        }*/
-
-        /*
-        else
-        {
-            printf("main thread: not fetched, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
-        }*/
-        //fetchCount=1-fetchCount;
+            }
 
 
 
