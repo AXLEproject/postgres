@@ -1579,7 +1579,7 @@ retry:
        //printf("main thread: Before if, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);
 
         if(
-                (prevEndAdr==NULL)
+                ((prevEndAdr==NULL)&&((prevStartAddr==NULL)))
                 ||
                 (((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevEndAdr)
                 ||
@@ -1610,9 +1610,9 @@ retry:
                 __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-            }
+            }/*
         else if(((char*) VfdCache[file].pm_ptr_list[i] + delta)!=prevStartAddr)
-        {
+            {
             //assign work to thread
             //prepare argument
 
@@ -1640,7 +1640,11 @@ retry:
                 __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
                 push_Index++;
                 push_Index = push_Index % jobQueueSize;      //increment queue push index
-        }/*
+        }*/
+
+
+        //printf("main thread: After if, startAddr=%p,prevFecthENdAddr=%p\n",prevStartAddr,prevEndAdr);
+        /*
         else
         {
             printf("main thread: else block, startAddr=%p,prevFecthENdAddr=%p\n",((char*) VfdCache[file].pm_ptr_list[i] + delta),prevEndAdr);

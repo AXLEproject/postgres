@@ -58,18 +58,21 @@ void prefetch_Data(void *argRcvd)
         //Note: if BlockSize=8192, following code will act as single-block fetcher.
         //This code can be improved since it always RE-fetch the overlapping blocks
         //(which ahve already been read in previous jobs)
-        amount=arg->remainingFileSize;
+        remFileSize=arg->remainingFileSize;
         /*
         A check to make sure that always a valid value of remFileSize is received,
         Since in some queries this value turns out to be negative.
         */
-        //if(remFileSize >= BlockSize)
-        if(amount >0)
+        if(remFileSize >= BlockSize)
+        {
+            amount=(size_t)remFileSize;
+            if(amount>BlockSize)
             {
-            prevFetchStartAdr=arg->srcAddr;
-            //prevFetchEndAdr=prevFetchStartAdr+amount-1;
-            memcpy(tempBuffer,prevFetchStartAdr,amount);
+                amount=BlockSize;
             }
+            prevFetchStartAdr=arg->srcAddr;
+            memcpy(tempBuffer,prevFetchStartAdr,amount);
+        }
     }
     else if((arg->fetchType)==2)
     {
