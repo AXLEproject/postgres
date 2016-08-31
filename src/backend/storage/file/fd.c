@@ -1541,48 +1541,38 @@ retry:
         //initilize thread (if already not initialized)
         if(gloablThrdeadID==NULL)
             {
-            //initialize mutex and cond var
-            pthread_mutex_init(&fetch_mutex, NULL);
-            //create thread
-            initThread(&gloablThrdeadID,3);
+            //set affinity of main thread to cpu 1
+            cpu_set_t cpus;
+            CPU_ZERO(&cpus);
+            CPU_SET(1, &cpus);
+            pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t),&cpus);
+            //create helper thread and sets it affinity
+            initThread(&gloablThrdeadID,2);
             //initailize all other variables
             push_Index=0;
-            pull_Index=0;            
-            remJobs=0;
-            prevFetchStartAdr=NULL;
-            prevFetchEndAdr=NULL;
+            pull_Index=0;
+            prevFetchStartAdr=NULL;            
             //setting last element of tempBuffer to NULL to avoid segmentation fault
             tempBuffer[BufferSize-1]=0;
-
-            job.argPlaced=0;
-            job.arg=NULL;
 
             for(loopIndex=0;loopIndex<jobQueueSize;++loopIndex)
                 {
                 jobArray[loopIndex].argPlaced=0;
                 }
-
             }
 
 
-           // if(((char*) VfdCache[file].pm_ptr_list[i] + delta)>prevFetchEndAdr)
-            {
-            //assign work to thread
-            //prepare argument
-            arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
-            arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-            // Only call helper for addresses alligned to BlockSize                
+        //assign work to thread
+        //prepare argument
+        arg.srcAddr=(char*) VfdCache[file].pm_ptr_list[i] + delta;//start copying from NVM location
+        arg.BlkSize=((VfdCache[file].pm_size_list[i])-delta);//remaining unfected size of file mapping
 
-
-                jobArray[push_Index].arg=&arg;                   //place job in job Queue
-                //__sync_synchronize();
-                __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
-                push_Index++;
-                push_Index = push_Index % jobQueueSize;      //increment queue push index
-            }
-
-
+        jobArray[push_Index].arg=&arg;                   //place job in job Queue
+        __sync_synchronize();
+        __sync_bool_compare_and_swap (&(jobArray[push_Index].argPlaced),0,1);
+        push_Index++;
+        push_Index = push_Index % jobQueueSize;      //increment queue push index
 
         //===============================================
 

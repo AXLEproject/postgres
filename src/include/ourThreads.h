@@ -19,8 +19,9 @@
 
 //*************************************************************
 /*Struct which is used to pass arguments to the prefetchData function
- * startAddr: Addres to fetch data from BlkSize: This item is not
- * named in the proper way. Actually it is used to pass the remaing
+ * startAddr: Addres to fetch data from
+ * BlkSize: This item is not named in the proper way.
+ * Actually it is used to pass the remaing
  * (unfetched) size of file to prefetch_Data()
 */
 
@@ -44,27 +45,22 @@ typedef struct jobUnit{
 //**************************************************************
 //a global thread ID used to create our ONLY thread
 pthread_t gloablThrdeadID;
-/*
- * fetch_mutex along with fetch_cv is used for controling r/w access
- * to job Queue which is accessed by both Postgres and helper thread.
-*/
-pthread_mutex_t fetch_mutex;
 
 /*
  * push_Index: used by postgres to insert jobs in the job queue.
- * pull_Index: used by helper thread for extracting jobs from job queue.
- * remJobs: indicates the jobs waiting queue to be serviced by helper thread at any given time
+ * pull_Index: used by helper thread for extracting jobs from job queue. 
  */
 int push_Index,pull_Index;
-int remJobs,localRemJobs,loopIndex;
+int loopIndex;
 
 
 /*
- * prevFetchStartAdr: shows the address from where helper threads start prefetching.
- * prevFetchEndAdr: it is not used yet.
+ * prevFetchStartAdr: shows the address from where helper threads start prefetching. 
  */
 char *prevFetchStartAdr;
-char *prevFetchEndAdr;
+
+
+
 /* Following variables are accessed only by helper thread.
  * tempBuffer: is the temporary buffer for prefetching data
  * remFileSize: indicates the remaining file size (which is not yet prefetched)
@@ -73,19 +69,18 @@ char *prevFetchEndAdr;
 char tempBuffer[BufferSize];
 off_t remFileSize;
 size_t amount;
+
 /*
  * jobArray: holds job.
- * job: global variable used in fd.c
  * arg: gloabl variable used in fd.c
  */
 
 jobUnit jobArray[jobQueueSize];
-jobUnit job;
 prefetch_args arg;
 
 //******************************************************************
 //initializ thread: This is called only once in fd.c by FileRead()
-void initThread(pthread_t *thrdIdPtr,unsigned char cpuNo);
+void initThread(pthread_t *thrdIdPtr,int cpuNo);
 //thread routine which keeps waiting until there are jobs to be serviced in the queue
 void waitLoop(void);
 //A dummy function

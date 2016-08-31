@@ -3,7 +3,7 @@
 
 
 void waitLoop()
-{
+{    
     /* Read job from queue and execute it */
     while(1)
     {
@@ -17,7 +17,7 @@ void waitLoop()
     }
 }
 
-void initThread(pthread_t *thrdIdPtr, unsigned char cpuNo)
+void initThread(pthread_t *thrdIdPtr, int cpuNo)
 {
 
     pthread_attr_t attr;
@@ -25,23 +25,13 @@ void initThread(pthread_t *thrdIdPtr, unsigned char cpuNo)
 
     pthread_attr_init(&attr);
 
-    //uncomment following line AND comment SNİPPET1 to execute postgres and helper thread on same cpu
-    //pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t),&cpus);
-
-    /*
-     * SNIPPET1:
-     * Following two lines place the helper thread on cpu 3
-     */
-
-    CPU_ZERO(&cpus);
-    //CPU_SET(3, &cpus);
-    CPU_SET(cpuNo, &cpus);
-
     //set affinity attribute
+    CPU_ZERO(&cpus);    
+    CPU_SET(cpuNo, &cpus);
     pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+
     //create thread and launch for execution. The thread will invoke waitloop routine
     pthread_create(thrdIdPtr, &attr , (void *)waitLoop, NULL);
-    pthread_detach(*thrdIdPtr);
 
 }
 
@@ -49,12 +39,9 @@ void prefetch_Data(void *argRcvd)
 {
     prefetch_args *arg = (prefetch_args*)argRcvd;
     //******************************************************************************
-    //mmemcopy based data prefetching
-    //printf("prefetching data \n");
+    //mmemcopy based data prefetching    
     //Multi-Block Prefetch
-    //Note: if BlockSize=8192, following code will act as single-block fetcher.
-    //This code can be improved since it always RE-fetch the overlapping blocks
-    //(which ahve already been read in previous jobs)
+    //Note: if BlockSize=8192, following code will act as single-block fetcher.    
     remFileSize=arg->BlkSize;
     /*
     A check to make sure that always a valid value of remFileSize is received,
@@ -69,8 +56,7 @@ void prefetch_Data(void *argRcvd)
             amount=BlockSize;
             }    
 
-        prevFetchStartAdr=arg->srcAddr;
-        prevFetchEndAdr=prevFetchStartAdr+amount-1;
+        prevFetchStartAdr=arg->srcAddr;        
         memcpy(tempBuffer,prevFetchStartAdr,amount);
         }
 }
